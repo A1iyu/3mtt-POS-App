@@ -1,0 +1,97 @@
+/* ==========================================================================
+   3MTT POS TERMINAL - PIXEL PERFECT MINT & NIGERIAN GREEN THEME
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
+
+:root {
+  /* Exact Nigerian Green & Mint Colors from Reference Images */
+  --ng-green-dark: #004d2c;
+  --ng-green-main: #008751;         /* Primary Button & Balance Green */
+  --ng-green-emerald: #059669;      /* Brand Box & Active Icons */
+  --ng-green-vibrant: #00a859;
+  --ng-green-glow: #00d06c;
+  --ng-green-soft-bubble: #d6f5e3;  /* Icon Bubbles on Dashboard */
+  --ng-green-pill-bg: #e6f7ee;      /* Encrypted & Online Pill BG */
+  --ng-green-pill-border: #a3e3be;  /* Encrypted Pill Border */
+
+  /* Gradient Background of the App (Full viewport fluid) */
+  --bg-gradient-top: #86efac;
+  --bg-gradient-mid: #a7f3d0;
+  --bg-gradient-bot: #dcfce7;
+  --bg-app-gradient: linear-gradient(175deg, #86efac 0%, #a7f3d0 25%, #bbf7d0 55%, #dcfce7 85%, #f0fdf4 100%);
+
+  /* Cards & Surface (Crisp Pure White) */
+  --surface-white: #ffffff;
+  --surface-white-card: #ffffff;
+  --surface-white-soft: rgba(255, 255, 255, 0.9);
+
+  /* Typography */
+  --text-dark: #0f2419;             /* Titles & High Contrast Text */
+  --text-main: #1f3a2c;
+  --text-muted: #52796f;            /* Labels & Subtitles */
+  --text-dim: #7da59a;
+  --text-white: #ffffff;
+
+  /* Form Elements */
+  --input-bg: #ffffff;
+  --input-border: #e2ece6;
+  --input-shadow: 0 2px 10px rgba(0, 77, 44, 0.05);
+  --card-shadow: 0 4px 20px rgba(0, 77, 44, 0.06);
+  --card-shadow-lg: 0 10px 30px rgba(0, 77, 44, 0.08);
+
+  /* Sizing & Radius */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Transitions */
+  --ease-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-smooth: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+body {
+  font-family: var(--font-main);
+  background: var(--bg-app-gradient);
+  background-attachment: fixed;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Fluid App Container - No Phone Card Bezel / Seamless Across Devices */
+.pos-app-container {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1rem;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .pos-app-container {
+    padding: 2rem 1.5rem;
+  }
+}

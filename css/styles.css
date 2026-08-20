@@ -1,0 +1,487 @@
+/* ==========================================================================
+   3MTT POS TERMINAL - APP LAYOUT & TRANSITIONS
+   ========================================================================== */
+
+/* Main Viewport Container */
+.pos-viewport-adaptive {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+}
+
+/* Individual App Views */
+.app-view {
+  display: none;
+  flex-direction: column;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.app-view.active {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Back Navigation Button */
+.nav-back-btn {
+  background: var(--surface-white);
+  border: 1px solid var(--border-field);
+  color: var(--ng-green-main);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--input-shadow);
+  transition: all var(--ease-fast);
+}
+
+.nav-back-btn:hover {
+  background-color: var(--ng-green-main);
+  color: var(--text-white);
+  border-color: var(--ng-green-main);
+}
+
+/* Centered Form Cards (for Login & Register) */
+.auth-centered-card {
+  width: 100%;
+  max-width: 480px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Centered Responsive Flow Cards (Confirmation, Success, etc.) */
+.flow-centered-card {
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Plain Confirmation Box */
+.plain-instruction-box {
+  background-color: var(--surface-white);
+  border: 2px solid var(--ng-green-main);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+}
+
+.instruction-tag {
+  font-size: 0.775rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--ng-green-main);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.4rem;
+}
+
+.instruction-bold-text {
+  font-family: var(--font-main);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  line-height: 1.3;
+}
+
+.breakdown-table-card {
+  background-color: var(--surface-white);
+  border-radius: var(--radius-xl);
+  padding: 1.35rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--card-shadow);
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.breakdown-row.total-row {
+  border-top: 1.5px dashed #d1fae5;
+  padding-top: 0.85rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.breakdown-row .val {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+/* Slide-to-Confirm */
+.slide-confirm-wrapper {
+  position: relative;
+  height: 62px;
+  background-color: var(--surface-white);
+  border: 2px solid var(--ng-green-main);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-top: auto;
+  user-select: none;
+  touch-action: pan-x;
+  box-shadow: var(--card-shadow);
+}
+
+.slide-confirm-text {
+  font-family: var(--font-main);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ng-green-main);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.slide-thumb {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 54px;
+  height: 50px;
+  background-color: var(--ng-green-main);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-white);
+  font-size: 1.35rem;
+  cursor: grab;
+  box-shadow: 0 3px 12px rgba(0, 135, 81, 0.4);
+}
+
+/* Success State & Receipt */
+.success-screen-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.success-badge-pop {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background-color: var(--ng-green-main);
+  color: var(--text-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 900;
+  box-shadow: 0 8px 25px rgba(0, 135, 81, 0.35);
+  margin-bottom: 0.85rem;
+  animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0.3); opacity: 0; }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-hero-text {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--ng-green-main);
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.success-sub-text {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.thermal-receipt-paper {
+  width: 100%;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 1.5rem 1.5rem 1.75rem;
+  border-radius: 8px 8px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  position: relative;
+  box-shadow: var(--card-shadow-lg);
+  margin-bottom: 1.5rem;
+}
+
+.thermal-receipt-paper::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: radial-gradient(circle, transparent, transparent 50%, #ffffff 50%, #ffffff 100%);
+  background-size: 14px 20px;
+}
+
+.receipt-header {
+  text-align: center;
+  border-bottom: 1px dashed #cbd5e1;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.receipt-brand-title {
+  font-family: var(--font-main);
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--ng-green-dark);
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.receipt-row.bold {
+  font-weight: 800;
+  font-size: 1rem;
+  border-top: 1px dashed #cbd5e1;
+  border-bottom: 1px dashed #cbd5e1;
+  padding: 0.5rem 0;
+  margin: 0.6rem 0;
+}
+
+.receipt-barcode {
+  margin-top: 0.85rem;
+  text-align: center;
+  letter-spacing: 0.25em;
+  font-size: 0.75rem;
+  color: #64748b;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 0.6rem;
+}
+
+.receipt-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  width: 100%;
+  margin-bottom: 0.85rem;
+}
+
+.btn-receipt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 52px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-main);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid var(--border-field);
+  background: var(--surface-white);
+  color: var(--text-dark);
+  transition: all var(--ease-fast);
+  box-shadow: var(--input-shadow);
+}
+
+.btn-receipt:hover {
+  border-color: var(--ng-green-main);
+  background-color: var(--ng-green-pill-bg);
+}
+
+.btn-receipt.whatsapp {
+  background: #25D366;
+  color: #ffffff;
+  border-color: #22c55e;
+}
+
+/* History List Card */
+.history-item {
+  background-color: var(--surface-white);
+  border-radius: var(--radius-lg);
+  padding: 1.15rem 1.35rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all var(--ease-fast);
+  margin-bottom: 0.75rem;
+  box-shadow: var(--card-shadow);
+}
+
+.history-item:hover {
+  transform: translateX(4px);
+  box-shadow: var(--card-shadow-lg);
+}
+
+.history-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.history-icon-circle {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  background-color: var(--ng-green-soft-bubble);
+  color: var(--ng-green-main);
+}
+
+.history-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.history-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.history-amount {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+
+.status-badge.successful {
+  background-color: var(--ng-green-pill-bg);
+  color: var(--ng-green-main);
+}
+
+.status-badge.failed {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 30, 20, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 999;
+  padding: 1rem;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-box {
+  background: var(--surface-white);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.modal-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.modal-close-btn {
+  background: var(--ng-green-pill-bg);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--ng-green-main);
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+/* Floating Toast */
+.pos-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-30px);
+  background: var(--ng-green-dark);
+  color: #ffffff;
+  padding: 0.85rem 1.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1000;
+}
+
+.pos-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

@@ -1,0 +1,230 @@
+/* ==========================================================================
+   3MTT POS TERMINAL - ADAPTIVE SPLIT KEYPAD (Side-by-Side on Wide Screens)
+   ========================================================================== */
+
+/* Split Layout Container */
+.keypad-split-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .keypad-split-layout {
+    grid-template-columns: 1.15fr 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+}
+
+.keypad-left-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.keypad-right-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background-color: var(--surface-white);
+  padding: 1.5rem;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--card-shadow-lg);
+}
+
+/* Amount Display Box */
+.amount-hero-box-ey {
+  background-color: var(--surface-white);
+  border-radius: var(--radius-xl);
+  padding: 1.6rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  box-shadow: var(--card-shadow-lg);
+}
+
+.amount-hero-label {
+  font-size: 0.775rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.amount-hero-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 4rem;
+}
+
+.amount-symbol-ey {
+  font-size: 2.35rem;
+  font-weight: 800;
+  color: var(--ng-green-main);
+}
+
+.amount-value-ey {
+  font-family: var(--font-main);
+  font-size: 3.25rem;
+  font-weight: 900;
+  color: var(--text-dark);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.amount-words-ey {
+  font-size: 0.85rem;
+  color: var(--ng-green-main);
+  font-weight: 700;
+  margin-top: 0.35rem;
+  min-height: 1.2rem;
+  text-align: center;
+}
+
+/* Quick Presets Scroller */
+.presets-scroller-ey {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem 0;
+  scrollbar-width: none;
+  flex-wrap: wrap;
+}
+
+.presets-scroller-ey::-webkit-scrollbar {
+  display: none;
+}
+
+.preset-chip-ey {
+  flex-shrink: 0;
+  background-color: var(--surface-white);
+  border: 1.5px solid var(--border-field);
+  color: var(--text-dark);
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font-main);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--ease-fast);
+  box-shadow: var(--input-shadow);
+}
+
+.preset-chip-ey:hover {
+  border-color: var(--ng-green-main);
+  background-color: var(--ng-green-pill-bg);
+}
+
+.preset-chip-ey:active {
+  transform: scale(0.95);
+  background-color: var(--ng-green-main);
+  color: var(--text-white);
+  border-color: var(--ng-green-main);
+}
+
+/* Numeric Keypad Grid */
+.keypad-grid-ey {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.key-btn-ey {
+  height: 62px;
+  background-color: #f6fbf8;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-dark);
+  font-family: var(--font-main);
+  font-size: 1.75rem;
+  font-weight: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--ease-fast);
+  box-shadow: var(--input-shadow);
+}
+
+.key-btn-ey .key-sub {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.15em;
+  margin-top: -3px;
+}
+
+.key-btn-ey:hover {
+  background-color: var(--ng-green-pill-bg);
+  border-color: var(--ng-green-main);
+}
+
+.key-btn-ey:active {
+  transform: scale(0.94);
+  background-color: var(--ng-green-main);
+  color: var(--text-white);
+  border-color: var(--ng-green-main);
+}
+
+.key-btn-ey.special {
+  background-color: #eaf4ee;
+  font-size: 1.15rem;
+}
+
+.key-btn-ey.clear {
+  color: #dc2626;
+}
+
+.key-btn-ey.clear:hover {
+  background-color: #fee2e2;
+  border-color: #dc2626;
+}
+
+.key-btn-ey.clear:active {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+/* PIN Indicator Bubbles */
+.pin-row-ey {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.pin-dot-ey {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid var(--border-field);
+  background: var(--surface-white);
+  transition: all 0.2s ease;
+}
+
+.pin-dot-ey.filled {
+  background-color: var(--ng-green-main);
+  border-color: var(--ng-green-main);
+  box-shadow: 0 0 14px rgba(0, 135, 81, 0.5);
+  transform: scale(1.15);
+}
+
+.pin-dot-ey.error-shake {
+  border-color: #dc2626;
+  background-color: #dc2626;
+  animation: shake 0.35s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
