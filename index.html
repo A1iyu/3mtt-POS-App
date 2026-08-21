@@ -240,12 +240,11 @@
 
           <h1 class="auth-title-exact" style="text-align:center;">Verify your identity</h1>
           <p class="auth-subtitle-exact" style="text-align:center;">
-            A 6-digit OTP has been sent to your email
-            <strong id="otp-masked-email">a***@***.com</strong>
-            and phone <strong id="otp-masked-phone">080*****78</strong>.
+            A 6-digit verification code has been sent to your email
+            <strong id="otp-masked-email">a***@***.com</strong>.
           </p>
 
-          <!-- Dual channel sent confirmation badges -->
+          <!-- Channel sent confirmation badge -->
           <div class="otp-sent-channels">
             <div class="otp-channel-badge">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -253,12 +252,6 @@
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
               <span>Email OTP Sent</span>
-            </div>
-            <div class="otp-channel-badge">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.08.5.18.99.3 1.47"/>
-              </svg>
-              <span>SMS OTP Sent</span>
             </div>
           </div>
 
@@ -272,9 +265,6 @@
             <input class="otp-digit-box" id="otp-d5" type="text" inputmode="numeric" maxlength="1" />
             <input class="otp-digit-box" id="otp-d6" type="text" inputmode="numeric" maxlength="1" />
           </div>
-
-          <!-- Hint for demo: show generated OTP -->
-          <div class="otp-demo-hint" id="otp-demo-hint">OTP (demo): <strong id="otp-demo-code">------</strong></div>
 
           <!-- Verify Button -->
           <button type="button" id="btn-submit-otp" class="btn-primary-green-exact" style="margin-top:1.25rem;">

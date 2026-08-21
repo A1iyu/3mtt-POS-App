@@ -7,6 +7,9 @@ import { store } from './transactions.js';
 import { KeypadController } from './keypad.js';
 import { receiptManager } from './receipt.js';
 
+// URL of the deployed OTP backend (see /pos-otp-server). Update after deploying to Render.
+const API_BASE = 'https://YOUR-RENDER-APP.onrender.com';
+
 class POSApp {
   constructor() {
     this.currentTxContext = {
@@ -18,8 +21,7 @@ class POSApp {
     this.activeTxResult = null;
     this.isPinMasked = true;
 
-    // OTP state
-    this._pendingOtp = null;
+    // OTP state (verification itself now happens server-side)
     this._pendingRegData = null;
     this._otpTimerInterval = null;
 
@@ -628,8 +630,8 @@ class POSApp {
       this.showView('login');
     });
 
-    // 3. Register Submission → go to OTP
-    document.getElementById('btn-submit-register')?.addEventListener('click', () => {
+    // 3. Register Submission → request a real email OTP, then go to OTP screen
+    document.getElementById('btn-submit-register')?.addEventListener('click', async () => {
       const name = document.getElementById('reg-name-input')?.value.trim();
       const biz = document.getElementById('reg-business-input')?.value.trim();
       const phone = document.getElementById('reg-phone-input')?.value.trim();
@@ -664,15 +666,9 @@ class POSApp {
       // Save pending data
       this._pendingRegData = { name, biz, phone, email, pin };
 
-      // Generate 6-digit OTP
-      this._pendingOtp = String(Math.floor(100000 + Math.random() * 900000));
-
       // Update OTP screen masked contact info
       const maskedEmail = email.replace(/(.{1}).+(@.+)/, '$1***$2');
-      const maskedPhone = phone.replace(/(\d{3})\d{5}(\d{2})/, '$1*****$2');
       document.getElementById('otp-masked-email').textContent = maskedEmail;
-      document.getElementById('otp-masked-phone').textContent = maskedPhone;
-      document.getElementById('otp-demo-code').textContent = this._pendingOtp;
 
       // Clear any previous digit inputs
       ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
@@ -681,9 +677,30 @@ class POSApp {
       });
 
       sound.playTap();
-      this.showToast(`OTP sent to ${maskedEmail} & ${maskedPhone}`);
-      this.startOtpTimer();
-      this.showView('otp');
+      const submitBtn = document.getElementById('btn-submit-register');
+      const originalLabel = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending code...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
+
+        this.showToast(`OTP sent to ${maskedEmail}`);
+        this.startOtpTimer();
+        this.showView('otp');
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not send OTP. Check your connection.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalLabel;
+      }
     });
 
     // OTP digit auto-advance logic
@@ -697,7 +714,7 @@ class POSApp {
     });
 
     // Verify OTP → finalize account creation
-    document.getElementById('btn-submit-otp')?.addEventListener('click', () => {
+    document.getElementById('btn-submit-otp')?.addEventListener('click', async () => {
       const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
         .map(id => document.getElementById(id)?.value || '')
         .join('');
@@ -708,7 +725,57 @@ class POSApp {
         return;
       }
 
-      if (entered !== this._pendingOtp) {
+      if (!this._pendingRegData) {
+        sound.playError();
+        this.showToast('Session expired. Please register again.');
+        this.showView('register');
+        return;
+      }
+
+      const verifyBtn = document.getElementById('btn-submit-otp');
+      const originalLabel = verifyBtn.textContent;
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Verifying...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/verify-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this._pendingRegData.email, otp: entered })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Incorrect OTP');
+
+        // OTP correct — create account
+        clearInterval(this._otpTimerInterval);
+        const { name, biz, phone, email, pin } = this._pendingRegData;
+        const tillP1 = Math.floor(1000 + Math.random() * 9000);
+        const tillP2 = Math.floor(1000 + Math.random() * 9000);
+        const tillP3 = Math.floor(10 + Math.random() * 90);
+        const generatedTill = `${tillP1} ${tillP2} ${tillP3}`;
+
+        store.createAccount({
+          name,
+          biz,
+          phone,
+          email,
+          pin,
+          tillNumber: generatedTill,
+          tillName: `${biz} Concept`
+        });
+
+        // Update login phone input so user can quickly re-login
+        const loginPhone = document.getElementById('login-phone-input');
+        if (loginPhone) loginPhone.value = phone;
+
+        sound.playSuccess();
+        this.showToast(`🎉 Account created! Welcome, ${biz}`);
+        this.renderDashboard();
+        this.renderProfileScreen();
+        this.renderBusinessScreen('ALL');
+        this.showView('menu');
+        this._pendingRegData = null;
+      } catch (err) {
         sound.playError();
         ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           document.getElementById(id)?.classList.add('error');
@@ -720,53 +787,40 @@ class POSApp {
           });
           document.getElementById('otp-d1')?.focus();
         }, 600);
-        this.showToast('Incorrect OTP! Check the code sent to your email/phone.');
-        return;
+        this.showToast(err.message || 'Incorrect OTP! Check the code sent to your email.');
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = originalLabel;
       }
-
-      // OTP correct — create account
-      clearInterval(this._otpTimerInterval);
-      const { name, biz, phone, email, pin } = this._pendingRegData;
-      const tillP1 = Math.floor(1000 + Math.random() * 9000);
-      const tillP2 = Math.floor(1000 + Math.random() * 9000);
-      const tillP3 = Math.floor(10 + Math.random() * 90);
-      const generatedTill = `${tillP1} ${tillP2} ${tillP3}`;
-
-      store.createAccount({
-        name,
-        biz,
-        phone,
-        email,
-        pin,
-        tillNumber: generatedTill,
-        tillName: `${biz} Concept`
-      });
-
-      // Update login phone input so user can quickly re-login
-      const loginPhone = document.getElementById('login-phone-input');
-      if (loginPhone) loginPhone.value = phone;
-
-      sound.playSuccess();
-      this.showToast(`🎉 Account created! Welcome, ${biz}`);
-      this.renderDashboard();
-      this.renderProfileScreen();
-      this.renderBusinessScreen('ALL');
-      this.showView('menu');
-      this._pendingOtp = null;
-      this._pendingRegData = null;
     });
 
     // Resend OTP button
-    document.getElementById('btn-resend-otp')?.addEventListener('click', () => {
-      this._pendingOtp = String(Math.floor(100000 + Math.random() * 900000));
-      document.getElementById('otp-demo-code').textContent = this._pendingOtp;
-      ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) { el.value = ''; el.classList.remove('filled','error'); }
-      });
+    document.getElementById('btn-resend-otp')?.addEventListener('click', async () => {
+      if (!this._pendingRegData) return;
       sound.playTap();
-      this.showToast('New OTP sent to your email and phone!');
-      this.startOtpTimer();
+      const resendBtn = document.getElementById('btn-resend-otp');
+      resendBtn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this._pendingRegData.email, name: this._pendingRegData.name })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to resend OTP');
+
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.value = ''; el.classList.remove('filled','error'); }
+        });
+        this.showToast('New OTP sent to your email!');
+        this.startOtpTimer();
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not resend OTP.');
+        resendBtn.disabled = false;
+      }
     });
 
     // Dashboard Header Agent Profile Click
