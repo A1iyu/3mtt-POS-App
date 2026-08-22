@@ -8,7 +8,7 @@ import { KeypadController } from './keypad.js';
 import { receiptManager } from './receipt.js';
 
 // URL of the deployed OTP backend (see /pos-otp-server). Update after deploying to Render.
-const API_BASE = 'https://threemtt-pos-app.onrender.com';
+const API_BASE = 'https://YOUR-RENDER-APP.onrender.com';
 
 class POSApp {
   constructor() {
@@ -176,7 +176,7 @@ class POSApp {
 
   // OTP digit box auto-advance / backspace / paste logic
   initOtpBoxes() {
-    const ids = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'];
+    const ids = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'];
     const boxes = ids.map(id => document.getElementById(id)).filter(Boolean);
 
     boxes.forEach((box, idx) => {
@@ -584,33 +584,73 @@ class POSApp {
 
   initEventListeners() {
     // 1. Login Actions
-    const performLogin = () => {
+    const performLogin = async () => {
       const phoneInput = document.getElementById('login-phone-input')?.value.trim();
       const pinInput = document.getElementById('login-pin-input')?.value.trim();
 
-      const matchedAccount = store.findAccount(phoneInput, pinInput);
-      if (matchedAccount) {
-        store.setActiveAccount(matchedAccount);
+      if (!phoneInput || !pinInput) {
+        sound.playError();
+        this.showToast('Enter your phone number and PIN');
+        return;
+      }
+
+      const loginBtn = document.getElementById('btn-submit-login');
+      const originalLabel = loginBtn ? loginBtn.textContent : '';
+      if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Signing in...'; }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phoneInput, pin: pinInput })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Incorrect phone or PIN');
+
+        const user = data.user;
+
+        // If this device already has local demo/wallet data for this account, restore it.
+        // Otherwise (new device, or cleared storage) bootstrap a fresh local profile —
+        // real sales/expenses still live safely in Supabase either way.
+        const localMatch = store.accounts.find(a =>
+          (a.phone || '').replace(/\s+/g, '') === (user.phone || '').replace(/\s+/g, '')
+        );
+
+        if (localMatch) {
+          store.setActiveAccount(localMatch);
+        } else {
+          const tillP1 = Math.floor(1000 + Math.random() * 9000);
+          const tillP2 = Math.floor(1000 + Math.random() * 9000);
+          const tillP3 = Math.floor(10 + Math.random() * 90);
+          store.createAccount({
+            name: user.name,
+            biz: user.business_name || user.name,
+            phone: user.phone,
+            email: user.email,
+            pin: pinInput,
+            tillNumber: `${tillP1} ${tillP2} ${tillP3}`,
+            tillName: `${user.business_name || user.name} Concept`
+          });
+        }
+
+        store.currentUserId = user.id;
+        store.persist();
+
         sound.playSuccess();
         this.showToast('Welcome back, ' + (store.agentBusiness || store.agentName || 'Agent'));
         this.renderDashboard();
         this.renderProfileScreen();
         this.renderBusinessScreen('ALL');
         this.showView('menu');
-      } else {
+      } catch (err) {
         sound.playError();
-        this.showToast('Incorrect phone or PIN. Please try again.');
+        this.showToast(err.message || 'Incorrect phone or PIN. Please try again.');
+      } finally {
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalLabel; }
       }
     };
 
     document.getElementById('btn-submit-login')?.addEventListener('click', performLogin);
-    document.getElementById('btn-fingerprint-login')?.addEventListener('click', () => {
-      sound.playSuccess();
-      this.showToast('Fingerprint Verified! ⚡ Instant Sign-in');
-      this.renderDashboard();
-      this.renderProfileScreen();
-      this.showView('menu');
-    });
 
     // 2. Navigation to "Create an Account" & Back
     document.getElementById('link-go-to-register')?.addEventListener('click', (e) => {
@@ -671,9 +711,9 @@ class POSApp {
       document.getElementById('otp-masked-email').textContent = maskedEmail;
 
       // Clear any previous digit inputs
-      ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+      ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
+        if (el) { el.value = ''; el.classList.remove('filled','error'); }
       });
 
       sound.playTap();
@@ -715,7 +755,7 @@ class POSApp {
 
     // Verify OTP → finalize account creation
     document.getElementById('btn-submit-otp')?.addEventListener('click', async () => {
-      const entered = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6']
+      const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
         .map(id => document.getElementById(id)?.value || '')
         .join('');
 
@@ -741,12 +781,19 @@ class POSApp {
         const res = await fetch(`${API_BASE}/api/verify-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this._pendingRegData.email, otp: entered })
+          body: JSON.stringify({
+            email: this._pendingRegData.email,
+            otp: entered,
+            name: this._pendingRegData.name,
+            businessName: this._pendingRegData.biz,
+            phone: this._pendingRegData.phone,
+            pin: this._pendingRegData.pin
+          })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Incorrect OTP');
 
-        // OTP correct — create account
+        // OTP correct and real account created in Supabase — set up local device state too
         clearInterval(this._otpTimerInterval);
         const { name, biz, phone, email, pin } = this._pendingRegData;
         const tillP1 = Math.floor(1000 + Math.random() * 9000);
@@ -764,6 +811,10 @@ class POSApp {
           tillName: `${biz} Concept`
         });
 
+        // Tie this device to the real backend account
+        store.currentUserId = data.user.id;
+        store.persist();
+
         // Update login phone input so user can quickly re-login
         const loginPhone = document.getElementById('login-phone-input');
         if (loginPhone) loginPhone.value = phone;
@@ -777,11 +828,11 @@ class POSApp {
         this._pendingRegData = null;
       } catch (err) {
         sound.playError();
-        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           document.getElementById(id)?.classList.add('error');
         });
         setTimeout(() => {
-          ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+          ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { el.value = ''; el.classList.remove('error'); }
           });
@@ -810,9 +861,9 @@ class POSApp {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to resend OTP');
 
-        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           const el = document.getElementById(id);
-          if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
+          if (el) { el.value = ''; el.classList.remove('filled','error'); }
         });
         this.showToast('New OTP sent to your email!');
         this.startOtpTimer();

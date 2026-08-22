@@ -15,7 +15,8 @@ const STORAGE_KEYS = {
   AGENT_PIN: '3mtt_pos_agent_pin_v3',
   AGENT_PHONE: '3mtt_pos_agent_phone_v3',
   COMMISSION_TIER: '3mtt_pos_commission_tier_v3',
-  ACCOUNTS_LIST: '3mtt_pos_accounts_list_v3'
+  ACCOUNTS_LIST: '3mtt_pos_accounts_list_v3',
+  CURRENT_USER_ID: '3mtt_pos_current_user_id_v3'
 };
 
 const DEFAULT_STATE = {
@@ -131,6 +132,8 @@ export class TransactionStore {
     this.agentPhone = this.load(STORAGE_KEYS.AGENT_PHONE, DEFAULT_STATE.agentPhone);
     this.agentPin = this.load(STORAGE_KEYS.AGENT_PIN, DEFAULT_STATE.agentPin);
     this.commissionTier = this.load(STORAGE_KEYS.COMMISSION_TIER, DEFAULT_STATE.commissionTier);
+    // The real Supabase user id for the signed-in agent (set on real login/registration)
+    this.currentUserId = this.load(STORAGE_KEYS.CURRENT_USER_ID, null);
     this.status = DEFAULT_STATE.status;
     this.accounts = this.load(STORAGE_KEYS.ACCOUNTS_LIST, [
       {
@@ -313,6 +316,7 @@ export class TransactionStore {
     this.save(STORAGE_KEYS.AGENT_PHONE, this.agentPhone);
     this.save(STORAGE_KEYS.AGENT_PIN, this.agentPin);
     this.save(STORAGE_KEYS.COMMISSION_TIER, this.commissionTier);
+    this.save(STORAGE_KEYS.CURRENT_USER_ID, this.currentUserId);
     // Keep the active account's record up-to-date in the accounts list
     const activeIdx = this.accounts.findIndex(a =>
       (a.phone || '').replace(/\s+/g, '') === (this.agentPhone || '').replace(/\s+/g, '')
