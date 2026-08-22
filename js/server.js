@@ -6,10 +6,16 @@
 
 import express from 'express';
 import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 app.use(cors()); // for production, restrict this to your front-end's origin
 app.use(express.json());
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY
+);
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Resend's shared sandbox sender — works with no domain setup.
@@ -76,8 +82,10 @@ app.post('/api/send-otp', async (req, res) => {
   }
 });
 
-app.post('/api/verify-otp', (req, res) => {
-  const { email, otp } = req.body || {};
+// Verify OTP AND create the real account in one step — an account can only
+// be created after a real OTP check passes.
+app.post('/api/verify-otp', async (req, res) => {
+  const { email, otp, name, businessName, phone, pin } = req.body || {};
   if (!email || !otp) {
     return res.status(400).json({ error: 'Email and OTP are required' });
   }
@@ -97,7 +105,157 @@ app.post('/api/verify-otp', (req, res) => {
   }
 
   otpStore.delete(key);
+
+  // If registration details were sent along with the OTP, create the account now.
+  if (name && phone && pin) {
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert({ name, business_name: businessName || null, phone, email, pin })
+      .select('id, name, business_name, phone, email, created_at')
+      .single();
+
+    if (error) {
+      // Postgres unique_violation
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'An account with this phone or email already exists' });
+      }
+      console.error('create user error:', error);
+      return res.status(500).json({ error: 'Verified, but failed to create the account' });
+    }
+
+    return res.json({ success: true, user });
+  }
+
   res.json({ success: true });
+});
+
+// Login with phone + PIN against the real users table
+app.post('/api/login', async (req, res) => {
+  const { phone, pin } = req.body || {};
+  if (!phone || !pin) {
+    return res.status(400).json({ error: 'Phone and PIN are required' });
+  }
+
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, name, business_name, phone, email, pin, created_at')
+    .eq('phone', phone)
+    .maybeSingle();
+
+  if (error) {
+    console.error('login lookup error:', error);
+    return res.status(500).json({ error: 'Server error during login' });
+  }
+  if (!user || user.pin !== pin) {
+    return res.status(401).json({ error: 'Incorrect phone number or PIN' });
+  }
+
+  delete user.pin;
+  res.json({ success: true, user });
+});
+
+// Record a sale with line items. orgId is optional — omit it for a personal entry.
+app.post('/api/sales', async (req, res) => {
+  const { userId, orgId, items, taxRate, note } = req.body || {};
+  if (!userId || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'userId and at least one item are required' });
+  }
+
+  const subtotal = items.reduce((sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0);
+  const tax = taxRate ? subtotal * Number(taxRate) : 0;
+  const total = subtotal + tax;
+
+  const { data: sale, error: saleError } = await supabase
+    .from('sales')
+    .insert({ user_id: userId, org_id: orgId || null, subtotal, tax, total, note: note || null })
+    .select()
+    .single();
+
+  if (saleError) {
+    console.error('create sale error:', saleError);
+    return res.status(500).json({ error: 'Failed to record sale' });
+  }
+
+  const itemRows = items.map(it => ({
+    sale_id: sale.id,
+    name: it.name,
+    quantity: Number(it.quantity) || 0,
+    unit_price: Number(it.unitPrice) || 0
+  }));
+
+  const { data: savedItems, error: itemsError } = await supabase
+    .from('sale_items')
+    .insert(itemRows)
+    .select();
+
+  if (itemsError) {
+    console.error('create sale_items error:', itemsError);
+    return res.status(500).json({ error: 'Sale saved, but items failed to save' });
+  }
+
+  res.json({ success: true, sale: { ...sale, items: savedItems } });
+});
+
+// List sales for a user (and optionally a specific org)
+app.get('/api/sales', async (req, res) => {
+  const { userId, orgId } = req.query;
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+  let query = supabase
+    .from('sales')
+    .select('*, sale_items(*)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (orgId) query = query.eq('org_id', orgId);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('list sales error:', error);
+    return res.status(500).json({ error: 'Failed to fetch sales' });
+  }
+  res.json({ sales: data });
+});
+
+// Record an expense. orgId is optional — omit it for a personal entry.
+app.post('/api/expenses', async (req, res) => {
+  const { userId, orgId, category, amount, note } = req.body || {};
+  if (!userId || !amount) {
+    return res.status(400).json({ error: 'userId and amount are required' });
+  }
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert({ user_id: userId, org_id: orgId || null, category: category || null, amount: Number(amount), note: note || null })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('create expense error:', error);
+    return res.status(500).json({ error: 'Failed to record expense' });
+  }
+  res.json({ success: true, expense: data });
+});
+
+// List expenses for a user (and optionally a specific org)
+app.get('/api/expenses', async (req, res) => {
+  const { userId, orgId } = req.query;
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+  let query = supabase
+    .from('expenses')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (orgId) query = query.eq('org_id', orgId);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('list expenses error:', error);
+    return res.status(500).json({ error: 'Failed to fetch expenses' });
+  }
+  res.json({ expenses: data });
 });
 
 app.get('/', (req, res) => res.send('3MTT POS OTP service is running.'));
