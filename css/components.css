@@ -190,6 +190,90 @@
   font-weight: 500;
 }
 
+/* ---- Record Sale: item rows (name / qty / unit / price) ---- */
+.sale-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.sale-item-row-fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.8fr 0.7fr 0.85fr 1fr;
+  gap: 0.5rem;
+}
+
+.sale-item-row-fields input {
+  height: 48px;
+  background-color: var(--surface-white);
+  border-radius: var(--radius-sm);
+  padding: 0 0.75rem;
+  border: 1.5px solid var(--input-border);
+  box-shadow: var(--input-shadow);
+  color: var(--text-dark);
+  font-family: var(--font-main);
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  min-width: 0;
+  transition: all var(--ease-fast);
+}
+
+.sale-item-row-fields input::placeholder {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.sale-item-row-fields input:focus {
+  border-color: var(--ng-green-main);
+  box-shadow: 0 4px 14px rgba(0, 135, 81, 0.12);
+}
+
+.btn-remove-item-row {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-add-item-row {
+  width: 100%;
+  padding: 0.7rem;
+  margin-top: 0.2rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--ng-green-pill-border);
+  background: var(--ng-green-pill-bg);
+  color: var(--ng-green-dark);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .sale-item-row-fields {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "name name"
+      "qty unit"
+      "price price";
+  }
+  .sale-item-row-fields .sale-item-name { grid-area: name; }
+  .sale-item-row-fields .sale-item-qty { grid-area: qty; }
+  .sale-item-row-fields .sale-item-unit { grid-area: unit; }
+  .sale-item-row-fields .sale-item-price { grid-area: price; }
+}
+
 .pin-eye-toggle-btn {
   background: none;
   border: none;

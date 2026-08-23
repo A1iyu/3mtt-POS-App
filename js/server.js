@@ -180,6 +180,7 @@ app.post('/api/sales', async (req, res) => {
     sale_id: sale.id,
     name: it.name,
     quantity: Number(it.quantity) || 0,
+    unit: it.unit || 'pcs',
     unit_price: Number(it.unitPrice) || 0
   }));
 

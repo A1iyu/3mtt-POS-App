@@ -22,9 +22,9 @@ class POSApp {
 
     this.initDOM();
     this.initEventListeners();
+    this.populateSaleItemSuggestions();
     this.renderDashboard();
     this.renderProfileScreen();
-    this.renderBusinessScreen('ALL');
     this.renderHistoryScreen('ALL');
     this.loadLedgerFromBackend();
   }
@@ -62,7 +62,6 @@ class POSApp {
 
       this.ledgerEntries = [...sales, ...expenses].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       this.renderDashboard();
-      this.renderBusinessScreen('ALL');
       this.renderHistoryScreen('ALL');
     } catch (err) {
       console.error('loadLedgerFromBackend error:', err);
@@ -155,18 +154,6 @@ class POSApp {
     }
   }
 
-  // ---- Business tab ----
-  renderBusinessScreen(filter = 'ALL') {
-    this.setStatDisplay('biz', this.getLedgerStats(this.ledgerEntries));
-
-    const listElem = document.getElementById('biz-ledger-items-container');
-    if (!listElem) return;
-
-    let entries = this.ledgerEntries;
-    if (filter !== 'ALL') entries = entries.filter(e => e.type === filter);
-    listElem.innerHTML = this.renderLedgerItemsHTML(entries);
-  }
-
   // ---- History tab (full ledger, same data, its own filter) ----
   renderHistoryScreen(filter = 'ALL') {
     const listElem = document.getElementById('history-items-container');
@@ -207,13 +194,69 @@ class POSApp {
     return `
       <div class="sale-item-row" data-item-row>
         <div class="sale-item-row-fields">
-          <input type="text" class="sale-item-name" placeholder="Item name" />
-          <input type="number" class="sale-item-qty" placeholder="Qty" min="1" step="1" value="1" />
-          <input type="number" class="sale-item-price" placeholder="₦ Price" min="0" step="0.01" />
+          <input type="text" class="sale-item-name" placeholder="Item name" list="sale-item-suggestions" autocomplete="off" />
+          <input type="number" class="sale-item-qty" placeholder="Qty" min="0.01" step="any" value="1" />
+          <input type="text" class="sale-item-unit" placeholder="Unit" list="sale-unit-suggestions" value="pcs" autocomplete="off" />
+          <input type="number" class="sale-item-price" placeholder="₦ Price / unit" min="0" step="0.01" />
         </div>
         <button type="button" class="btn-remove-item-row" aria-label="Remove item">✕</button>
       </div>
     `;
+  }
+
+  // ---- Recently used sale items (device-local, so typing a few letters of
+  //      a previously recorded item name auto-suggests it and autofills its
+  //      last used unit + price) ----
+  loadRecentSaleItems() {
+    try {
+      const raw = localStorage.getItem('3mtt_pos_recent_sale_items_v1');
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  saveRecentSaleItems(items) {
+    // items: array of {name, quantity, unit, unitPrice}
+    const existing = this.loadRecentSaleItems();
+    items.forEach(({ name, unit, unitPrice }) => {
+      if (!name) return;
+      const key = name.trim().toLowerCase();
+      const idx = existing.findIndex(it => it.name.toLowerCase() === key);
+      const entry = { name: name.trim(), unit: unit || 'pcs', unitPrice: unitPrice ?? '' };
+      if (idx > -1) existing.splice(idx, 1);
+      existing.unshift(entry);
+    });
+    const trimmed = existing.slice(0, 40);
+    try {
+      localStorage.setItem('3mtt_pos_recent_sale_items_v1', JSON.stringify(trimmed));
+    } catch (e) { /* storage unavailable, safe to ignore */ }
+    this.populateSaleItemSuggestions(trimmed);
+  }
+
+  populateSaleItemSuggestions(items = this.loadRecentSaleItems()) {
+    const datalist = document.getElementById('sale-item-suggestions');
+    if (!datalist) return;
+    datalist.innerHTML = items.map(it => `<option value="${it.name.replace(/"/g, '&quot;')}"></option>`).join('');
+  }
+
+  // If the typed/selected item name matches a previously recorded item,
+  // fill in its last used unit and price (only when those fields are empty).
+  autofillSaleItemRow(row) {
+    const nameInput = row.querySelector('.sale-item-name');
+    const unitInput = row.querySelector('.sale-item-unit');
+    const priceInput = row.querySelector('.sale-item-price');
+    if (!nameInput) return;
+
+    const typed = nameInput.value.trim().toLowerCase();
+    if (!typed) return;
+
+    const match = this.loadRecentSaleItems().find(it => it.name.toLowerCase() === typed);
+    if (!match) return;
+
+    if (unitInput && !unitInput.value.trim()) unitInput.value = match.unit || 'pcs';
+    if (priceInput && !priceInput.value) priceInput.value = match.unitPrice || '';
+    this.recalcSaleTotals();
   }
 
   resetSaleModal() {
@@ -255,9 +298,10 @@ class POSApp {
     rows.forEach(row => {
       const name = row.querySelector('.sale-item-name')?.value.trim();
       const quantity = parseFloat(row.querySelector('.sale-item-qty')?.value) || 0;
+      const unit = row.querySelector('.sale-item-unit')?.value.trim() || 'pcs';
       const unitPrice = parseFloat(row.querySelector('.sale-item-price')?.value) || 0;
       if (name && quantity > 0 && unitPrice >= 0) {
-        items.push({ name, quantity, unitPrice });
+        items.push({ name, quantity, unit, unitPrice });
       }
     });
     return items;
@@ -269,7 +313,6 @@ class POSApp {
       register: document.getElementById('view-register'),
       otp: document.getElementById('view-otp'),
       menu: document.getElementById('view-menu'),
-      business: document.getElementById('view-business'),
       history: document.getElementById('view-history'),
       profile: document.getElementById('view-profile')
     };
@@ -293,12 +336,10 @@ class POSApp {
     else if (viewName === 'menu') this.renderDashboard();
 
     const homeBtn = document.getElementById('nav-btn-home');
-    const bizBtn = document.getElementById('nav-btn-business');
     const histBtn = document.getElementById('nav-btn-history');
     const profBtn = document.getElementById('nav-btn-profile');
 
     if (homeBtn) homeBtn.classList.toggle('active', viewName === 'menu');
-    if (bizBtn) bizBtn.classList.toggle('active', viewName === 'business');
     if (histBtn) histBtn.classList.toggle('active', viewName === 'history');
     if (profBtn) profBtn.classList.toggle('active', viewName === 'profile');
   }
@@ -641,23 +682,8 @@ class POSApp {
       sound.playTap();
       this.showView('menu');
     });
-    document.getElementById('nav-btn-home-from-biz')?.addEventListener('click', () => {
-      sound.playTap();
-      this.showView('menu');
-    });
-
-    document.getElementById('nav-btn-business')?.addEventListener('click', () => {
-      sound.playTap();
-      this.renderBusinessScreen('ALL');
-      this.showView('business');
-    });
 
     document.getElementById('nav-btn-history')?.addEventListener('click', () => {
-      sound.playTap();
-      this.renderHistoryScreen('ALL');
-      this.showView('history');
-    });
-    document.getElementById('nav-btn-history-from-biz')?.addEventListener('click', () => {
       sound.playTap();
       this.renderHistoryScreen('ALL');
       this.showView('history');
@@ -667,22 +693,14 @@ class POSApp {
       sound.playTap();
       this.showView('profile');
     });
-    document.getElementById('nav-btn-profile-from-biz')?.addEventListener('click', () => {
-      sound.playTap();
-      this.showView('profile');
-    });
 
     document.getElementById('btn-home-view-all')?.addEventListener('click', () => {
       sound.playTap();
-      this.renderBusinessScreen('ALL');
-      this.showView('business');
+      this.renderHistoryScreen('ALL');
+      this.showView('history');
     });
 
     // Back buttons
-    document.getElementById('btn-back-from-business')?.addEventListener('click', () => {
-      sound.playTap();
-      this.showView('menu');
-    });
     document.getElementById('btn-back-from-history')?.addEventListener('click', () => {
       sound.playTap();
       this.showView('menu');
@@ -696,6 +714,7 @@ class POSApp {
     document.querySelectorAll('.btn-trigger-record-sale').forEach(btn => {
       btn.addEventListener('click', () => {
         sound.playTap();
+        this.populateSaleItemSuggestions();
         this.resetSaleModal();
         this.modals.recordSale.classList.add('active');
       });
@@ -738,6 +757,14 @@ class POSApp {
     document.getElementById('sale-items-list')?.addEventListener('input', () => this.recalcSaleTotals());
     document.getElementById('sale-tax-rate-input')?.addEventListener('input', () => this.recalcSaleTotals());
 
+    // When an item name matches something recorded before (typed or picked from
+    // suggestions), auto-fill its last used unit + price so re-entry is fast.
+    document.getElementById('sale-items-list')?.addEventListener('change', (e) => {
+      if (e.target.classList.contains('sale-item-name')) {
+        this.autofillSaleItemRow(e.target.closest('.sale-item-row'));
+      }
+    });
+
     document.getElementById('btn-submit-record-sale')?.addEventListener('click', async () => {
       const items = this.collectSaleItems();
       const note = document.getElementById('sale-note-input')?.value.trim();
@@ -775,6 +802,7 @@ class POSApp {
 
         sound.playSuccess();
         this.showToast(`+₦${total.toLocaleString('en-NG', { minimumFractionDigits: 2 })} Sale Recorded!`);
+        this.saveRecentSaleItems(items);
         this.modals.recordSale.classList.remove('active');
         this.resetSaleModal();
 
@@ -837,16 +865,6 @@ class POSApp {
       } finally {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel; }
       }
-    });
-
-    // Business tab filter pills
-    document.querySelectorAll('.biz-filter-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        sound.playTap();
-        document.querySelectorAll('.biz-filter-pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        this.renderBusinessScreen(pill.getAttribute('data-filter'));
-      });
     });
 
     // History tab filter pills
