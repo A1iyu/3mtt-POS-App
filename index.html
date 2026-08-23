@@ -134,7 +134,12 @@
           <div class="field-group-exact">
             <label class="field-label-exact">FULL NAME</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">👤</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </span>
               <input type="text" id="reg-name-input" placeholder="e.g. Musa Aliyu" />
             </div>
           </div>
@@ -142,7 +147,12 @@
           <div class="field-group-exact">
             <label class="field-label-exact">BUSINESS / TILL NAME</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">🏪</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 9.5 12 3l9 6.5"/>
+                  <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>
+                </svg>
+              </span>
               <input type="text" id="reg-business-input" placeholder="e.g. Aliyu Enterprise" />
             </div>
           </div>
@@ -150,7 +160,11 @@
           <div class="field-group-exact">
             <label class="field-label-exact">PHONE NUMBER</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">📞</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+              </span>
               <input type="tel" id="reg-phone-input" placeholder="0800 000 0000" />
             </div>
           </div>
@@ -171,7 +185,12 @@
           <div class="field-group-exact">
             <label class="field-label-exact">CREATE 4-DIGIT PIN</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">🔒</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </span>
               <input type="password" id="reg-pin-input" placeholder="••••" maxlength="4" />
             </div>
           </div>
@@ -179,7 +198,13 @@
           <div class="field-group-exact" style="margin-bottom:1.5rem;">
             <label class="field-label-exact">CONFIRM 4-DIGIT PIN</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">🔐</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  <path d="m9 16 2 2 4-4"/>
+                </svg>
+              </span>
               <input type="password" id="reg-pin-confirm-input" placeholder="••••" maxlength="4" />
             </div>
           </div>
@@ -293,17 +318,17 @@
         <!-- 3 Metrics Overview Card -->
         <div class="business-overview-grid">
           <div class="biz-metric-card">
-            <div class="biz-metric-label"><span>📈</span> Total Sales</div>
+            <div class="biz-metric-label"><span class="metric-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span> Total Sales</div>
             <div class="biz-metric-val sales" id="home-total-sales">₦0.00</div>
           </div>
 
           <div class="biz-metric-card">
-            <div class="biz-metric-label"><span>📉</span> Total Expenses</div>
+            <div class="biz-metric-label"><span class="metric-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg></span> Total Expenses</div>
             <div class="biz-metric-val expenses" id="home-total-expenses">₦0.00</div>
           </div>
 
           <div class="biz-metric-card">
-            <div class="biz-metric-label"><span>💰</span> Net Profit</div>
+            <div class="biz-metric-label"><span class="metric-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.2"/><path d="M6 12h.01M18 12h.01"/></svg></span> Net Profit</div>
             <div class="biz-metric-val profit" id="home-net-profit">₦0.00</div>
           </div>
         </div>
@@ -427,7 +452,10 @@
     <div id="modal-record-sale" class="modal-overlay" aria-hidden="true">
       <div class="modal-box">
         <div class="modal-header-row">
-          <h3 class="modal-title">📈 Record a Sale</h3>
+          <h3 class="modal-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            Record a Sale
+          </h3>
           <button class="modal-close-btn modal-backdrop-dismiss" aria-label="Close">✕</button>
         </div>
 
@@ -463,7 +491,9 @@
           <div class="field-group-exact">
             <label class="field-label-exact">NOTE / CUSTOMER (OPTIONAL)</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">📝</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </span>
               <input type="text" id="sale-note-input" placeholder="Customer name or remarks" />
             </div>
           </div>
@@ -496,7 +526,10 @@
     <div id="modal-add-expense" class="modal-overlay" aria-hidden="true">
       <div class="modal-box">
         <div class="modal-header-row">
-          <h3 class="modal-title" style="color:#dc2626;">📉 Track Business Expense</h3>
+          <h3 class="modal-title" style="color:#dc2626;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            Track Business Expense
+          </h3>
           <button class="modal-close-btn modal-backdrop-dismiss" aria-label="Close">✕</button>
         </div>
 
@@ -504,7 +537,9 @@
           <div class="field-group-exact">
             <label class="field-label-exact">EXPENSE DESCRIPTION</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">⛽</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M14 2v5h5"/><path d="M9 13h6M9 17h6M9 9h1"/></svg>
+              </span>
               <input type="text" id="expense-title-input" placeholder="e.g. Generator Petrol, POS Paper Roll" required />
             </div>
           </div>
@@ -512,7 +547,9 @@
           <div class="field-group-exact">
             <label class="field-label-exact">CATEGORY</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">📂</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </span>
               <select id="expense-category-select">
                 <option value="Utilities & Power">Utilities & Generator Power</option>
                 <option value="Supplies">POS Thermal Paper & Supplies</option>
@@ -535,7 +572,9 @@
           <div class="field-group-exact" style="margin-bottom:1.5rem;">
             <label class="field-label-exact">REASON / NOTE (OPTIONAL)</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">📝</span>
+              <span class="icon-lead">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </span>
               <input type="text" id="expense-note-input" placeholder="e.g. Bought from NNPC station" />
             </div>
           </div>

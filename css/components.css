@@ -668,6 +668,14 @@
   gap: 0.4rem;
 }
 
+.metric-icon,
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .biz-metric-val {
   font-family: var(--font-main);
   font-size: 1.45rem;

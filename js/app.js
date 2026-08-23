@@ -74,7 +74,14 @@ class POSApp {
     if (entries.length === 0) {
       return `
         <div style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted); background:var(--surface-white); border-radius:var(--radius-lg);">
-          <div style="font-size:2.5rem; margin-bottom:0.5rem;">📊</div>
+          <div style="margin-bottom:0.75rem; display:flex; justify-content:center;">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v16a2 2 0 0 0 2 2h16"/>
+              <path d="M18 17V9"/>
+              <path d="M13 17V5"/>
+              <path d="M8 17v-3"/>
+            </svg>
+          </div>
           <div style="font-weight:700;">${emptyMessage}</div>
           <div style="font-size:0.8rem; margin-top:0.25rem;">Use the buttons above to record your first entry.</div>
         </div>
@@ -85,7 +92,9 @@ class POSApp {
       <div class="biz-ledger-item">
         <div style="display:flex; align-items:center; gap:0.85rem;">
           <div class="biz-item-icon ${item.type.toLowerCase()}">
-            ${item.type === 'SALE' ? '📈' : '⛽'}
+            ${item.type === 'SALE'
+              ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>'
+              : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>'}
           </div>
           <div>
             <div style="font-size:1.05rem; font-weight:800; color:var(--text-dark);">${item.title}</div>
@@ -196,7 +205,7 @@ class POSApp {
         <div class="sale-item-row-fields">
           <input type="text" class="sale-item-name" placeholder="Item name" list="sale-item-suggestions" autocomplete="off" />
           <input type="number" class="sale-item-qty" placeholder="Qty" min="0.01" step="any" value="1" />
-          <input type="text" class="sale-item-unit" placeholder="Unit" list="sale-unit-suggestions" value="pcs" autocomplete="off" />
+          <input type="text" class="sale-item-unit" placeholder="Unit (pcs)" list="sale-unit-suggestions" autocomplete="off" />
           <input type="number" class="sale-item-price" placeholder="₦ Price / unit" min="0" step="0.01" />
         </div>
         <button type="button" class="btn-remove-item-row" aria-label="Remove item">✕</button>
@@ -346,7 +355,7 @@ class POSApp {
 
   showToast(message) {
     if (!this.toastElem) return;
-    this.toastElem.innerHTML = `<span>⚡</span> <span>${message}</span>`;
+    this.toastElem.innerHTML = `<span class="toast-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></span> <span>${message}</span>`;
     this.toastElem.classList.add('show');
     setTimeout(() => {
       this.toastElem.classList.remove('show');
@@ -602,7 +611,7 @@ class POSApp {
         if (loginPhone) loginPhone.value = data.user.phone;
 
         sound.playSuccess();
-        this.showToast(`🎉 Account created! Welcome, ${data.user.business_name || data.user.name}`);
+        this.showToast(`Account created! Welcome, ${data.user.business_name || data.user.name}`);
         this.renderDashboard();
         this.renderProfileScreen();
         this.showView('menu');
