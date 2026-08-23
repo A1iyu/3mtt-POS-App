@@ -8,7 +8,7 @@ import { KeypadController } from './keypad.js';
 import { receiptManager } from './receipt.js';
 
 // URL of the deployed OTP backend (see /pos-otp-server). Update after deploying to Render.
-const API_BASE = 'https://threemtt-pos-app.onrender.com';
+const API_BASE = 'https://YOUR-RENDER-APP.onrender.com';
 
 class POSApp {
   constructor() {
@@ -25,12 +25,140 @@ class POSApp {
     this._pendingRegData = null;
     this._otpTimerInterval = null;
 
+    // Real sales/expenses fetched from Supabase (via the backend)
+    this.ledgerEntries = [];
+    this._saleItemRowCounter = 0;
+
     this.initKeypads();
     this.initDOM();
     this.initEventListeners();
     this.renderDashboard();
     this.renderProfileScreen();
     this.renderBusinessScreen('ALL');
+    this.loadLedgerFromBackend();
+  }
+
+  // Fetch this agent's real sales and expenses from Supabase and normalize
+  // them into one list the ledger UI already knows how to render.
+  async loadLedgerFromBackend() {
+    if (!store.currentUserId) return; // not signed in to a real account yet
+
+    try {
+      const [salesRes, expensesRes] = await Promise.all([
+        fetch(`${API_BASE}/api/sales?userId=${store.currentUserId}`),
+        fetch(`${API_BASE}/api/expenses?userId=${store.currentUserId}`)
+      ]);
+      const salesData = await salesRes.json();
+      const expensesData = await expensesRes.json();
+
+      const sales = (salesData.sales || []).map(s => ({
+        type: 'SALE',
+        title: (s.sale_items && s.sale_items[0] && s.sale_items[0].name) || 'Sale',
+        category: s.sale_items && s.sale_items.length > 1 ? `${s.sale_items.length} items` : 'Goods Sold',
+        amount: Number(s.total),
+        note: s.note || '',
+        timestamp: s.created_at
+      }));
+
+      const expenses = (expensesData.expenses || []).map(e => ({
+        type: 'EXPENSE',
+        title: e.category || 'Expense',
+        category: e.category || 'General Expense',
+        amount: Number(e.amount),
+        note: e.note || '',
+        timestamp: e.created_at
+      }));
+
+      this.ledgerEntries = [...sales, ...expenses].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      this.renderBusinessScreen('ALL');
+      this.renderDashboard();
+    } catch (err) {
+      console.error('loadLedgerFromBackend error:', err);
+      this.showToast('Could not load your sales/expenses right now');
+    }
+  }
+
+  // --- Multi-item Record Sale modal helpers -------------------------------
+
+  addSaleItemRow(prefill = {}) {
+    const list = document.getElementById('sale-items-list');
+    if (!list) return;
+
+    const rowId = `sale-item-${++this._saleItemRowCounter}`;
+    const row = document.createElement('div');
+    row.className = 'sale-item-row';
+    row.dataset.rowId = rowId;
+    row.innerHTML = `
+      <div class="sale-item-row-fields">
+        <input type="text" class="sale-item-name" placeholder="Item name" value="${prefill.name || ''}" />
+        <input type="number" class="sale-item-qty" placeholder="Qty" min="1" value="${prefill.quantity || 1}" />
+        <input type="number" class="sale-item-price" placeholder="Unit price ₦" min="0" value="${prefill.unitPrice || ''}" />
+      </div>
+      <button type="button" class="btn-remove-item-row" aria-label="Remove item">✕</button>
+    `;
+    list.appendChild(row);
+
+    row.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', () => this.recalcSaleTotals());
+    });
+
+    row.querySelector('.btn-remove-item-row').addEventListener('click', () => {
+      sound.playTap();
+      const allRows = list.querySelectorAll('.sale-item-row');
+      if (allRows.length <= 1) {
+        // Keep at least one row — just clear it instead of removing
+        row.querySelector('.sale-item-name').value = '';
+        row.querySelector('.sale-item-qty').value = 1;
+        row.querySelector('.sale-item-price').value = '';
+      } else {
+        row.remove();
+      }
+      this.recalcSaleTotals();
+    });
+
+    this.recalcSaleTotals();
+  }
+
+  resetSaleModal() {
+    const list = document.getElementById('sale-items-list');
+    if (list) list.innerHTML = '';
+    this._saleItemRowCounter = 0;
+    this.addSaleItemRow();
+
+    const taxInput = document.getElementById('sale-tax-rate-input');
+    const noteInput = document.getElementById('sale-note-input');
+    if (taxInput) taxInput.value = '';
+    if (noteInput) noteInput.value = '';
+    this.recalcSaleTotals();
+  }
+
+  getSaleItemsFromForm() {
+    const rows = document.querySelectorAll('#sale-items-list .sale-item-row');
+    const items = [];
+    rows.forEach(row => {
+      const name = row.querySelector('.sale-item-name')?.value.trim();
+      const quantity = parseFloat(row.querySelector('.sale-item-qty')?.value) || 0;
+      const unitPrice = parseFloat(row.querySelector('.sale-item-price')?.value) || 0;
+      if (name && quantity > 0 && unitPrice > 0) {
+        items.push({ name, quantity, unitPrice });
+      }
+    });
+    return items;
+  }
+
+  recalcSaleTotals() {
+    const items = this.getSaleItemsFromForm();
+    const subtotal = items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
+    const taxRatePercent = parseFloat(document.getElementById('sale-tax-rate-input')?.value) || 0;
+    const tax = subtotal * (taxRatePercent / 100);
+    const total = subtotal + tax;
+
+    const subtotalElem = document.getElementById('sale-subtotal-display');
+    const taxElem = document.getElementById('sale-tax-display');
+    const totalElem = document.getElementById('sale-total-display');
+    if (subtotalElem) subtotalElem.textContent = `₦${subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (taxElem) taxElem.textContent = `₦${tax.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (totalElem) totalElem.textContent = `₦${total.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
   }
 
   initKeypads() {
@@ -176,7 +304,7 @@ class POSApp {
 
   // OTP digit box auto-advance / backspace / paste logic
   initOtpBoxes() {
-    const ids = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'];
+    const ids = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'];
     const boxes = ids.map(id => document.getElementById(id)).filter(Boolean);
 
     boxes.forEach((box, idx) => {
@@ -296,25 +424,90 @@ class POSApp {
   }
 
   // Render Business Bookkeeper & Expense Ledger
+  // ---- Multi-item Record Sale helpers ----
+
+  createSaleItemRowHTML() {
+    return `
+      <div class="sale-item-row" data-item-row>
+        <div class="sale-item-row-fields">
+          <input type="text" class="sale-item-name" placeholder="Item name" />
+          <input type="number" class="sale-item-qty" placeholder="Qty" min="1" step="1" value="1" />
+          <input type="number" class="sale-item-price" placeholder="₦ Price" min="0" step="0.01" />
+        </div>
+        <button type="button" class="btn-remove-item-row" aria-label="Remove item">✕</button>
+      </div>
+    `;
+  }
+
+  resetSaleModal() {
+    const list = document.getElementById('sale-items-list');
+    if (list) list.innerHTML = this.createSaleItemRowHTML();
+    const taxInput = document.getElementById('sale-tax-rate-input');
+    const noteInput = document.getElementById('sale-note-input');
+    if (taxInput) taxInput.value = '';
+    if (noteInput) noteInput.value = '';
+    this.recalcSaleTotals();
+  }
+
+  recalcSaleTotals() {
+    const rows = document.querySelectorAll('#sale-items-list .sale-item-row');
+    let subtotal = 0;
+    rows.forEach(row => {
+      const qty = parseFloat(row.querySelector('.sale-item-qty')?.value) || 0;
+      const price = parseFloat(row.querySelector('.sale-item-price')?.value) || 0;
+      subtotal += qty * price;
+    });
+
+    const taxRatePercent = parseFloat(document.getElementById('sale-tax-rate-input')?.value) || 0;
+    const tax = subtotal * (taxRatePercent / 100);
+    const total = subtotal + tax;
+
+    const subEl = document.getElementById('sale-subtotal-display');
+    const taxEl = document.getElementById('sale-tax-display');
+    const totEl = document.getElementById('sale-total-display');
+    if (subEl) subEl.textContent = `₦${subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (taxEl) taxEl.textContent = `₦${tax.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (totEl) totEl.textContent = `₦${total.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+
+    return { subtotal, tax, total, taxRatePercent };
+  }
+
+  collectSaleItems() {
+    const rows = document.querySelectorAll('#sale-items-list .sale-item-row');
+    const items = [];
+    rows.forEach(row => {
+      const name = row.querySelector('.sale-item-name')?.value.trim();
+      const quantity = parseFloat(row.querySelector('.sale-item-qty')?.value) || 0;
+      const unitPrice = parseFloat(row.querySelector('.sale-item-price')?.value) || 0;
+      if (name && quantity > 0 && unitPrice >= 0) {
+        items.push({ name, quantity, unitPrice });
+      }
+    });
+    return items;
+  }
+
   renderBusinessScreen(filter = 'ALL') {
-    const stats = store.getBusinessStats();
+    const allEntries = this.ledgerEntries;
+    const totalSales = allEntries.filter(e => e.type === 'SALE').reduce((sum, e) => sum + e.amount, 0);
+    const totalExpenses = allEntries.filter(e => e.type === 'EXPENSE').reduce((sum, e) => sum + e.amount, 0);
+    const netProfit = totalSales - totalExpenses;
 
     const salesElem = document.getElementById('biz-total-sales');
     const expensesElem = document.getElementById('biz-total-expenses');
     const profitElem = document.getElementById('biz-net-profit');
 
-    if (salesElem) salesElem.textContent = `₦${stats.totalSales.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    if (expensesElem) expensesElem.textContent = `₦${stats.totalExpenses.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (salesElem) salesElem.textContent = `₦${totalSales.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (expensesElem) expensesElem.textContent = `₦${totalExpenses.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
     if (profitElem) {
-      const prefix = stats.netProfit >= 0 ? '+' : '';
-      profitElem.textContent = `${prefix}₦${stats.netProfit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-      profitElem.style.color = stats.netProfit >= 0 ? 'var(--ng-green-main)' : '#dc2626';
+      const prefix = netProfit >= 0 ? '+' : '';
+      profitElem.textContent = `${prefix}₦${netProfit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+      profitElem.style.color = netProfit >= 0 ? 'var(--ng-green-main)' : '#dc2626';
     }
 
     const listElem = document.getElementById('biz-ledger-items-container');
     if (!listElem) return;
 
-    let entries = store.businessEntries;
+    let entries = allEntries;
     if (filter !== 'ALL') {
       entries = entries.filter(e => e.type === filter);
     }
@@ -642,6 +835,7 @@ class POSApp {
         this.renderProfileScreen();
         this.renderBusinessScreen('ALL');
         this.showView('menu');
+        this.loadLedgerFromBackend();
       } catch (err) {
         sound.playError();
         this.showToast(err.message || 'Incorrect phone or PIN. Please try again.');
@@ -711,9 +905,9 @@ class POSApp {
       document.getElementById('otp-masked-email').textContent = maskedEmail;
 
       // Clear any previous digit inputs
-      ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+      ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
+        if (el) { el.value = ''; el.classList.remove('filled','error'); }
       });
 
       sound.playTap();
@@ -755,7 +949,7 @@ class POSApp {
 
     // Verify OTP → finalize account creation
     document.getElementById('btn-submit-otp')?.addEventListener('click', async () => {
-      const entered = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6']
+      const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
         .map(id => document.getElementById(id)?.value || '')
         .join('');
 
@@ -828,11 +1022,11 @@ class POSApp {
         this._pendingRegData = null;
       } catch (err) {
         sound.playError();
-        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           document.getElementById(id)?.classList.add('error');
         });
         setTimeout(() => {
-          ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+          ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { el.value = ''; el.classList.remove('error'); }
           });
@@ -861,9 +1055,9 @@ class POSApp {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to resend OTP');
 
-        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           const el = document.getElementById(id);
-          if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
+          if (el) { el.value = ''; el.classList.remove('filled','error'); }
         });
         this.showToast('New OTP sent to your email!');
         this.startOtpTimer();
@@ -979,6 +1173,7 @@ class POSApp {
     // 8. Business Bookkeeping Modal Openers & Submissions
     document.getElementById('btn-open-record-sale')?.addEventListener('click', () => {
       sound.playTap();
+      this.resetSaleModal();
       this.modals.recordSale.classList.add('active');
     });
 
@@ -987,38 +1182,88 @@ class POSApp {
       this.modals.addExpense.classList.add('active');
     });
 
-    document.getElementById('btn-submit-record-sale')?.addEventListener('click', () => {
-      const title = document.getElementById('sale-title-input')?.value.trim();
-      const category = document.getElementById('sale-category-select')?.value;
-      const amount = parseFloat(document.getElementById('sale-amount-input')?.value);
-      const note = document.getElementById('sale-note-input')?.value.trim();
+    // Add a new blank item row
+    document.getElementById('btn-add-sale-item')?.addEventListener('click', () => {
+      sound.playTap();
+      const list = document.getElementById('sale-items-list');
+      if (!list) return;
+      list.insertAdjacentHTML('beforeend', this.createSaleItemRowHTML());
+      const rows = list.querySelectorAll('.sale-item-row');
+      rows[rows.length - 1]?.querySelector('.sale-item-name')?.focus();
+      this.recalcSaleTotals();
+    });
 
-      if (!title || !amount || amount <= 0) {
+    // Remove a row (event delegation) and live-recalculate totals as fields change
+    document.getElementById('sale-items-list')?.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-remove-item-row')) {
+        const list = document.getElementById('sale-items-list');
+        const rows = list.querySelectorAll('.sale-item-row');
+        if (rows.length <= 1) {
+          // Keep at least one row — just clear it instead of removing
+          const row = e.target.closest('.sale-item-row');
+          row.querySelector('.sale-item-name').value = '';
+          row.querySelector('.sale-item-qty').value = '1';
+          row.querySelector('.sale-item-price').value = '';
+        } else {
+          e.target.closest('.sale-item-row')?.remove();
+        }
+        this.recalcSaleTotals();
+      }
+    });
+
+    document.getElementById('sale-items-list')?.addEventListener('input', () => this.recalcSaleTotals());
+    document.getElementById('sale-tax-rate-input')?.addEventListener('input', () => this.recalcSaleTotals());
+
+    document.getElementById('btn-submit-record-sale')?.addEventListener('click', async () => {
+      const items = this.collectSaleItems();
+      const note = document.getElementById('sale-note-input')?.value.trim();
+      const { subtotal, total, taxRatePercent } = this.recalcSaleTotals();
+
+      if (items.length === 0) {
         sound.playError();
-        this.showToast('Please enter a valid title and amount!');
+        this.showToast('Add at least one item with a name and price!');
         return;
       }
 
-      store.recordBusinessEntry({
-        type: 'SALE',
-        title,
-        category,
-        amount,
-        note
-      });
+      if (!store.currentUserId) {
+        sound.playError();
+        this.showToast('Please sign in again to record a sale.');
+        return;
+      }
 
-      sound.playSuccess();
-      this.showToast(`+₦${amount.toLocaleString()} Sale Recorded!`);
-      this.modals.recordSale.classList.remove('active');
-      document.getElementById('sale-title-input').value = '';
-      document.getElementById('sale-amount-input').value = '';
-      document.getElementById('sale-note-input').value = '';
+      const saveBtn = document.getElementById('btn-submit-record-sale');
+      const originalLabel = saveBtn ? saveBtn.textContent : '';
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
-      this.renderBusinessScreen('ALL');
-      this.renderDashboard();
+      try {
+        const res = await fetch(`${API_BASE}/api/sales`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: store.currentUserId,
+            items,
+            taxRate: taxRatePercent / 100,
+            note
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to record sale');
+
+        sound.playSuccess();
+        this.showToast(`+₦${total.toLocaleString('en-NG', { minimumFractionDigits: 2 })} Sale Recorded!`);
+        this.modals.recordSale.classList.remove('active');
+        this.resetSaleModal();
+
+        await this.loadLedgerFromBackend();
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not save sale. Check your connection.');
+      } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel; }
+      }
     });
 
-    document.getElementById('btn-submit-add-expense')?.addEventListener('click', () => {
+    document.getElementById('btn-submit-add-expense')?.addEventListener('click', async () => {
       const title = document.getElementById('expense-title-input')?.value.trim();
       const category = document.getElementById('expense-category-select')?.value;
       const amount = parseFloat(document.getElementById('expense-amount-input')?.value);
@@ -1030,23 +1275,44 @@ class POSApp {
         return;
       }
 
-      store.recordBusinessEntry({
-        type: 'EXPENSE',
-        title,
-        category,
-        amount,
-        note
-      });
+      if (!store.currentUserId) {
+        sound.playError();
+        this.showToast('Please sign in again to record an expense.');
+        return;
+      }
 
-      sound.playSuccess();
-      this.showToast(`-₦${amount.toLocaleString()} Expense Tracked!`);
-      this.modals.addExpense.classList.remove('active');
-      document.getElementById('expense-title-input').value = '';
-      document.getElementById('expense-amount-input').value = '';
-      document.getElementById('expense-note-input').value = '';
+      const saveBtn = document.getElementById('btn-submit-add-expense');
+      const originalLabel = saveBtn ? saveBtn.textContent : '';
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
-      this.renderBusinessScreen('ALL');
-      this.renderDashboard();
+      try {
+        const res = await fetch(`${API_BASE}/api/expenses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: store.currentUserId,
+            category: category || title,
+            amount,
+            note: title !== category ? `${title}${note ? ' — ' + note : ''}` : note
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to record expense');
+
+        sound.playSuccess();
+        this.showToast(`-₦${amount.toLocaleString()} Expense Tracked!`);
+        this.modals.addExpense.classList.remove('active');
+        document.getElementById('expense-title-input').value = '';
+        document.getElementById('expense-amount-input').value = '';
+        document.getElementById('expense-note-input').value = '';
+
+        await this.loadLedgerFromBackend();
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not save expense. Check your connection.');
+      } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel; }
+      }
     });
 
     // Business Filter Pills
