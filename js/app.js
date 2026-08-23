@@ -1,45 +1,36 @@
 /* ==========================================================================
-   3MTT POS TERMINAL - APP CONTROLLER (Business Bookkeeper & POS State Engine)
+   3MTT POS APP - APP CONTROLLER (Real Sales & Expense Ledger)
    ========================================================================== */
 
 import { sound } from './audio.js';
 import { store } from './transactions.js';
-import { KeypadController } from './keypad.js';
 import { receiptManager } from './receipt.js';
 
-// URL of the deployed OTP backend (see /pos-otp-server). Update after deploying to Render.
+// URL of the deployed backend (see /pos-otp-server). Update after deploying to Render.
 const API_BASE = 'https://threemtt-pos-app.onrender.com';
 
 class POSApp {
   constructor() {
-    this.currentTxContext = {
-      type: 'CASHOUT',
-      amount: 0,
-      beneficiary: ''
-    };
-
-    this.activeTxResult = null;
     this.isPinMasked = true;
 
-    // OTP state (verification itself now happens server-side)
+    // OTP state (verification itself happens server-side)
     this._pendingRegData = null;
     this._otpTimerInterval = null;
 
     // Real sales/expenses fetched from Supabase (via the backend)
     this.ledgerEntries = [];
-    this._saleItemRowCounter = 0;
 
-    this.initKeypads();
     this.initDOM();
     this.initEventListeners();
     this.renderDashboard();
     this.renderProfileScreen();
     this.renderBusinessScreen('ALL');
+    this.renderHistoryScreen('ALL');
     this.loadLedgerFromBackend();
   }
 
   // Fetch this agent's real sales and expenses from Supabase and normalize
-  // them into one list the ledger UI already knows how to render.
+  // them into one list every ledger view (Home preview, Business, History) shares.
   async loadLedgerFromBackend() {
     if (!store.currentUserId) return; // not signed in to a real account yet
 
@@ -70,315 +61,79 @@ class POSApp {
       }));
 
       this.ledgerEntries = [...sales, ...expenses].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      this.renderBusinessScreen('ALL');
       this.renderDashboard();
+      this.renderBusinessScreen('ALL');
+      this.renderHistoryScreen('ALL');
     } catch (err) {
       console.error('loadLedgerFromBackend error:', err);
       this.showToast('Could not load your sales/expenses right now');
     }
   }
 
-  // --- Multi-item Record Sale modal helpers -------------------------------
+  // ---- Shared ledger item rendering (used by Home preview, Business tab, History tab) ----
+  renderLedgerItemsHTML(entries, emptyMessage = 'No sales or expense entries yet') {
+    if (entries.length === 0) {
+      return `
+        <div style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted); background:var(--surface-white); border-radius:var(--radius-lg);">
+          <div style="font-size:2.5rem; margin-bottom:0.5rem;">📊</div>
+          <div style="font-weight:700;">${emptyMessage}</div>
+          <div style="font-size:0.8rem; margin-top:0.25rem;">Use the buttons above to record your first entry.</div>
+        </div>
+      `;
+    }
 
-  addSaleItemRow(prefill = {}) {
-    const list = document.getElementById('sale-items-list');
-    if (!list) return;
-
-    const rowId = `sale-item-${++this._saleItemRowCounter}`;
-    const row = document.createElement('div');
-    row.className = 'sale-item-row';
-    row.dataset.rowId = rowId;
-    row.innerHTML = `
-      <div class="sale-item-row-fields">
-        <input type="text" class="sale-item-name" placeholder="Item name" value="${prefill.name || ''}" />
-        <input type="number" class="sale-item-qty" placeholder="Qty" min="1" value="${prefill.quantity || 1}" />
-        <input type="number" class="sale-item-price" placeholder="Unit price ₦" min="0" value="${prefill.unitPrice || ''}" />
+    return entries.map(item => `
+      <div class="biz-ledger-item">
+        <div style="display:flex; align-items:center; gap:0.85rem;">
+          <div class="biz-item-icon ${item.type.toLowerCase()}">
+            ${item.type === 'SALE' ? '📈' : '⛽'}
+          </div>
+          <div>
+            <div style="font-size:1.05rem; font-weight:800; color:var(--text-dark);">${item.title}</div>
+            <div style="font-size:0.8rem; color:var(--text-muted); display:flex; gap:0.5rem; align-items:center;">
+              <span style="font-weight:700; color:var(--ng-green-dark);">${item.category}</span>
+              <span>•</span>
+              <span>${receiptManager.formatDate(item.timestamp)}</span>
+            </div>
+            ${item.note ? `<div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">${item.note}</div>` : ''}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="biz-item-amount ${item.type.toLowerCase()}">
+            ${item.type === 'SALE' ? '+₦' : '-₦'}${item.amount.toLocaleString()}
+          </div>
+          <span style="font-size:0.68rem; font-weight:800; padding:0.2rem 0.55rem; border-radius:var(--radius-full); text-transform:uppercase; background:${item.type === 'SALE' ? 'var(--ng-green-pill-bg)' : '#fee2e2'}; color:${item.type === 'SALE' ? 'var(--ng-green-main)' : '#dc2626'};">
+            ${item.type}
+          </span>
+        </div>
       </div>
-      <button type="button" class="btn-remove-item-row" aria-label="Remove item">✕</button>
-    `;
-    list.appendChild(row);
-
-    row.querySelectorAll('input').forEach(input => {
-      input.addEventListener('input', () => this.recalcSaleTotals());
-    });
-
-    row.querySelector('.btn-remove-item-row').addEventListener('click', () => {
-      sound.playTap();
-      const allRows = list.querySelectorAll('.sale-item-row');
-      if (allRows.length <= 1) {
-        // Keep at least one row — just clear it instead of removing
-        row.querySelector('.sale-item-name').value = '';
-        row.querySelector('.sale-item-qty').value = 1;
-        row.querySelector('.sale-item-price').value = '';
-      } else {
-        row.remove();
-      }
-      this.recalcSaleTotals();
-    });
-
-    this.recalcSaleTotals();
+    `).join('');
   }
 
-  resetSaleModal() {
-    const list = document.getElementById('sale-items-list');
-    if (list) list.innerHTML = '';
-    this._saleItemRowCounter = 0;
-    this.addSaleItemRow();
-
-    const taxInput = document.getElementById('sale-tax-rate-input');
-    const noteInput = document.getElementById('sale-note-input');
-    if (taxInput) taxInput.value = '';
-    if (noteInput) noteInput.value = '';
-    this.recalcSaleTotals();
+  getLedgerStats(entries) {
+    const totalSales = entries.filter(e => e.type === 'SALE').reduce((sum, e) => sum + e.amount, 0);
+    const totalExpenses = entries.filter(e => e.type === 'EXPENSE').reduce((sum, e) => sum + e.amount, 0);
+    return { totalSales, totalExpenses, netProfit: totalSales - totalExpenses };
   }
 
-  getSaleItemsFromForm() {
-    const rows = document.querySelectorAll('#sale-items-list .sale-item-row');
-    const items = [];
-    rows.forEach(row => {
-      const name = row.querySelector('.sale-item-name')?.value.trim();
-      const quantity = parseFloat(row.querySelector('.sale-item-qty')?.value) || 0;
-      const unitPrice = parseFloat(row.querySelector('.sale-item-price')?.value) || 0;
-      if (name && quantity > 0 && unitPrice > 0) {
-        items.push({ name, quantity, unitPrice });
-      }
-    });
-    return items;
-  }
+  setStatDisplay(prefixId, stats) {
+    const salesElem = document.getElementById(`${prefixId}-total-sales`);
+    const expensesElem = document.getElementById(`${prefixId}-total-expenses`);
+    const profitElem = document.getElementById(`${prefixId}-net-profit`);
 
-  recalcSaleTotals() {
-    const items = this.getSaleItemsFromForm();
-    const subtotal = items.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
-    const taxRatePercent = parseFloat(document.getElementById('sale-tax-rate-input')?.value) || 0;
-    const tax = subtotal * (taxRatePercent / 100);
-    const total = subtotal + tax;
-
-    const subtotalElem = document.getElementById('sale-subtotal-display');
-    const taxElem = document.getElementById('sale-tax-display');
-    const totalElem = document.getElementById('sale-total-display');
-    if (subtotalElem) subtotalElem.textContent = `₦${subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    if (taxElem) taxElem.textContent = `₦${tax.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    if (totalElem) totalElem.textContent = `₦${total.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-  }
-
-  initKeypads() {
-    // Amount Keypad
-    this.amountKeypad = new KeypadController({
-      mode: 'amount',
-      onAmountChange: (data) => {
-        const displayElem = document.getElementById('amount-digits-display');
-        const wordsElem = document.getElementById('amount-words-text');
-        const nextBtn = document.getElementById('btn-amount-continue');
-
-        if (displayElem) {
-          displayElem.textContent = data.formatted;
-        }
-
-        if (wordsElem) {
-          wordsElem.textContent = data.words;
-        }
-
-        if (nextBtn) {
-          nextBtn.disabled = data.value <= 0;
-          nextBtn.style.opacity = data.value > 0 ? '1' : '0.5';
-        }
-      }
-    });
-
-    // Auth PIN Keypad
-    this.authPinKeypad = new KeypadController({
-      mode: 'pin',
-      maxDigits: 4,
-      onPinChange: (pin) => {
-        this.updatePinBubbles('auth-pin-bubble', pin);
-      },
-      onPinComplete: (pin) => {
-        this.verifyAuthPin(pin);
-      }
-    });
-  }
-
-  initDOM() {
-    this.views = {
-      login: document.getElementById('view-login'),
-      register: document.getElementById('view-register'),
-      otp: document.getElementById('view-otp'),
-      menu: document.getElementById('view-menu'),
-      business: document.getElementById('view-business'),
-      amount: document.getElementById('view-amount'),
-      confirm: document.getElementById('view-confirm'),
-      pin: document.getElementById('view-pin'),
-      success: document.getElementById('view-success'),
-      history: document.getElementById('view-history'),
-      profile: document.getElementById('view-profile')
-    };
-
-    this.modals = {
-      details: document.getElementById('modal-details'),
-      recordSale: document.getElementById('modal-record-sale'),
-      addExpense: document.getElementById('modal-add-expense')
-    };
-
-    this.toastElem = document.getElementById('pos-toast');
-  }
-
-  showView(viewName) {
-    Object.keys(this.views).forEach(key => {
-      if (this.views[key]) {
-        this.views[key].classList.remove('active');
-      }
-    });
-
-    if (this.views[viewName]) {
-      this.views[viewName].classList.add('active');
-    }
-
-    if (viewName === 'profile') {
-      this.renderProfileScreen();
-    } else if (viewName === 'menu') {
-      this.renderDashboard();
-    }
-
-    // Update bottom nav state
-    const homeBtn = document.getElementById('nav-btn-home');
-    const bizBtn = document.getElementById('nav-btn-business');
-    const histBtn = document.getElementById('nav-btn-history');
-    const profBtn = document.getElementById('nav-btn-profile');
-
-    if (homeBtn && histBtn && profBtn) {
-      homeBtn.classList.toggle('active', viewName === 'menu');
-      if (bizBtn) bizBtn.classList.toggle('active', viewName === 'business');
-      histBtn.classList.toggle('active', viewName === 'history');
-      profBtn.classList.toggle('active', viewName === 'profile');
+    if (salesElem) salesElem.textContent = `₦${stats.totalSales.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (expensesElem) expensesElem.textContent = `₦${stats.totalExpenses.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+    if (profitElem) {
+      const prefix = stats.netProfit >= 0 ? '+' : '';
+      profitElem.textContent = `${prefix}₦${stats.netProfit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
+      profitElem.style.color = stats.netProfit >= 0 ? 'var(--ng-green-main)' : '#dc2626';
     }
   }
 
-  showToast(message) {
-    if (!this.toastElem) return;
-    this.toastElem.innerHTML = `<span>⚡</span> <span>${message}</span>`;
-    this.toastElem.classList.add('show');
-    setTimeout(() => {
-      this.toastElem.classList.remove('show');
-    }, 2500);
-  }
-
-  updatePinBubbles(className, pin) {
-    const bubbles = document.querySelectorAll(`.${className}`);
-    bubbles.forEach((b, idx) => {
-      if (idx < pin.length) {
-        b.classList.add('filled');
-      } else {
-        b.classList.remove('filled');
-      }
-    });
-  }
-
-  verifyAuthPin(pin) {
-    if (pin === store.agentPin) {
-      this.activeTxResult = store.processTransaction({
-        type: this.currentTxContext.type,
-        amount: this.currentTxContext.amount,
-        beneficiary: this.currentTxContext.beneficiary || 'Customer Walk-in'
-      });
-
-      sound.playSuccess();
-      const speakMsg = `${this.currentTxContext.type === 'CASHOUT' ? 'Cash withdrawal' : 'Transaction'} of ₦${this.currentTxContext.amount.toLocaleString()} successful`;
-      sound.speak(speakMsg);
-
-      this.authPinKeypad.reset();
-      this.renderSuccessScreen();
-      this.renderBusinessScreen('ALL');
-      this.showView('success');
-    } else {
-      sound.playError();
-      this.showToast('Wrong PIN! Please try again.');
-      const bubbles = document.querySelectorAll('.auth-pin-bubble');
-      bubbles.forEach(b => b.classList.add('error-shake'));
-      setTimeout(() => {
-        bubbles.forEach(b => b.classList.remove('error-shake'));
-        this.authPinKeypad.reset();
-      }, 500);
-    }
-  }
-
-
-  // OTP digit box auto-advance / backspace / paste logic
-  initOtpBoxes() {
-    const ids = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'];
-    const boxes = ids.map(id => document.getElementById(id)).filter(Boolean);
-
-    boxes.forEach((box, idx) => {
-      box.addEventListener('input', () => {
-        const val = box.value.replace(/\D/g, '');
-        box.value = val.slice(-1); // keep only last digit
-        if (val) {
-          box.classList.add('filled');
-          if (idx < boxes.length - 1) boxes[idx + 1].focus();
-        } else {
-          box.classList.remove('filled');
-        }
-      });
-
-      box.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !box.value && idx > 0) {
-          boxes[idx - 1].value = '';
-          boxes[idx - 1].classList.remove('filled');
-          boxes[idx - 1].focus();
-        }
-      });
-
-      box.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
-        pasted.split('').slice(0, 6).forEach((ch, i) => {
-          if (boxes[i]) {
-            boxes[i].value = ch;
-            boxes[i].classList.add('filled');
-          }
-        });
-        boxes[Math.min(pasted.length, 5)].focus();
-      });
-    });
-  }
-
-  // 60-second countdown for OTP resend button
-  startOtpTimer() {
-    clearInterval(this._otpTimerInterval);
-    const btn = document.getElementById('btn-resend-otp');
-    const countEl = document.getElementById('otp-timer-count');
-    if (!btn || !countEl) return;
-
-    let seconds = 60;
-    btn.disabled = true;
-    countEl.textContent = seconds;
-    btn.textContent = `Resend in ${seconds}s`;
-
-    this._otpTimerInterval = setInterval(() => {
-      seconds--;
-      if (seconds <= 0) {
-        clearInterval(this._otpTimerInterval);
-        btn.disabled = false;
-        btn.textContent = 'Resend OTP';
-      } else {
-        btn.textContent = `Resend in ${seconds}s`;
-      }
-    }, 1000);
-  }
-
+  // ---- Home dashboard ----
   renderDashboard() {
-    const balanceElem = document.getElementById('dashboard-balance-val');
-    if (balanceElem) {
-      balanceElem.textContent = `₦${store.walletBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    }
-
-    const tillElem = document.getElementById('till-number-val');
-    if (tillElem) tillElem.textContent = store.tillNumber;
-
-    const merchantElem = document.getElementById('till-merchant-val');
-    if (merchantElem) merchantElem.textContent = store.tillName || `${store.agentBusiness} Concept`;
-
     const titleElem = document.getElementById('dash-business-title');
-    if (titleElem) titleElem.textContent = store.agentBusiness;
+    if (titleElem) titleElem.textContent = store.agentBusiness || 'My Business';
 
     const avatarElem = document.getElementById('dash-avatar-circle');
     if (avatarElem) {
@@ -391,18 +146,44 @@ class POSApp {
         .toUpperCase();
       avatarElem.textContent = initials || 'AG';
     }
+
+    this.setStatDisplay('home', this.getLedgerStats(this.ledgerEntries));
+
+    const recentContainer = document.getElementById('home-recent-entries-container');
+    if (recentContainer) {
+      recentContainer.innerHTML = this.renderLedgerItemsHTML(this.ledgerEntries.slice(0, 5));
+    }
+  }
+
+  // ---- Business tab ----
+  renderBusinessScreen(filter = 'ALL') {
+    this.setStatDisplay('biz', this.getLedgerStats(this.ledgerEntries));
+
+    const listElem = document.getElementById('biz-ledger-items-container');
+    if (!listElem) return;
+
+    let entries = this.ledgerEntries;
+    if (filter !== 'ALL') entries = entries.filter(e => e.type === filter);
+    listElem.innerHTML = this.renderLedgerItemsHTML(entries);
+  }
+
+  // ---- History tab (full ledger, same data, its own filter) ----
+  renderHistoryScreen(filter = 'ALL') {
+    const listElem = document.getElementById('history-items-container');
+    if (!listElem) return;
+
+    let entries = this.ledgerEntries;
+    if (filter !== 'ALL') entries = entries.filter(e => e.type === filter);
+    listElem.innerHTML = this.renderLedgerItemsHTML(entries, 'No entries found');
   }
 
   renderProfileScreen() {
     const avatarElem = document.getElementById('profile-avatar-circle');
     const bizElem = document.getElementById('profile-business-name');
-    const tillElem = document.getElementById('profile-terminal-id');
     const phoneElem = document.getElementById('profile-agent-phone');
     const nameElem = document.getElementById('profile-agent-name');
     const emailElem = document.getElementById('profile-agent-email');
     const statusElem = document.getElementById('profile-agent-status');
-    const merchantElem = document.getElementById('profile-merchant-name');
-    const tierElem = document.getElementById('profile-commission-tier');
 
     const initials = (store.agentBusiness || store.agentName || 'AG')
       .split(' ')
@@ -414,17 +195,13 @@ class POSApp {
 
     if (avatarElem) avatarElem.textContent = initials || 'AG';
     if (bizElem) bizElem.textContent = store.agentBusiness || 'Agent Business';
-    if (tillElem) tillElem.textContent = `Terminal ID: ${store.tillNumber}`;
-    if (phoneElem) phoneElem.textContent = store.agentPhone || '0800 000 0000';
+    if (phoneElem) phoneElem.textContent = store.agentPhone || '';
     if (nameElem) nameElem.textContent = store.agentName || store.agentBusiness;
-    if (emailElem) emailElem.textContent = store.agentEmail || 'agent@3mtt.pos';
-    if (statusElem) statusElem.textContent = store.status || 'Active / Online';
-    if (merchantElem) merchantElem.textContent = store.tillName || `${store.agentBusiness} Concept`;
-    if (tierElem) tierElem.textContent = store.commissionTier || 'Super Agent (75%)';
+    if (emailElem) emailElem.textContent = store.agentEmail || '';
+    if (statusElem) statusElem.textContent = 'Active / Online';
   }
 
-  // Render Business Bookkeeper & Expense Ledger
-  // ---- Multi-item Record Sale helpers ----
+  // ---- Multi-item Record Sale modal helpers ----
 
   createSaleItemRowHTML() {
     return `
@@ -486,297 +263,120 @@ class POSApp {
     return items;
   }
 
-  renderBusinessScreen(filter = 'ALL') {
-    const allEntries = this.ledgerEntries;
-    const totalSales = allEntries.filter(e => e.type === 'SALE').reduce((sum, e) => sum + e.amount, 0);
-    const totalExpenses = allEntries.filter(e => e.type === 'EXPENSE').reduce((sum, e) => sum + e.amount, 0);
-    const netProfit = totalSales - totalExpenses;
-
-    const salesElem = document.getElementById('biz-total-sales');
-    const expensesElem = document.getElementById('biz-total-expenses');
-    const profitElem = document.getElementById('biz-net-profit');
-
-    if (salesElem) salesElem.textContent = `₦${totalSales.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    if (expensesElem) expensesElem.textContent = `₦${totalExpenses.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-    if (profitElem) {
-      const prefix = netProfit >= 0 ? '+' : '';
-      profitElem.textContent = `${prefix}₦${netProfit.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
-      profitElem.style.color = netProfit >= 0 ? 'var(--ng-green-main)' : '#dc2626';
-    }
-
-    const listElem = document.getElementById('biz-ledger-items-container');
-    if (!listElem) return;
-
-    let entries = allEntries;
-    if (filter !== 'ALL') {
-      entries = entries.filter(e => e.type === filter);
-    }
-
-    if (entries.length === 0) {
-      listElem.innerHTML = `
-        <div style="text-align:center; padding:2.5rem 1rem; color:var(--text-muted); background:var(--surface-white); border-radius:var(--radius-lg);">
-          <div style="font-size:2.5rem; margin-bottom:0.5rem;">📊</div>
-          <div style="font-weight:700;">No sales or expense entries yet</div>
-          <div style="font-size:0.8rem; margin-top:0.25rem;">Use the buttons above to record your first entry.</div>
-        </div>
-      `;
-      return;
-    }
-
-    listElem.innerHTML = entries.map(item => `
-      <div class="biz-ledger-item">
-        <div style="display:flex; align-items:center; gap:0.85rem;">
-          <div class="biz-item-icon ${item.type.toLowerCase()}">
-            ${item.type === 'SALE' ? '📈' : '⛽'}
-          </div>
-          <div>
-            <div style="font-size:1.05rem; font-weight:800; color:var(--text-dark);">${item.title}</div>
-            <div style="font-size:0.8rem; color:var(--text-muted); display:flex; gap:0.5rem; align-items:center;">
-              <span style="font-weight:700; color:var(--ng-green-dark);">${item.category}</span>
-              <span>•</span>
-              <span>${receiptManager.formatDate(item.timestamp)}</span>
-            </div>
-            ${item.note ? `<div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">${item.note}</div>` : ''}
-          </div>
-        </div>
-        <div style="text-align:right;">
-          <div class="biz-item-amount ${item.type.toLowerCase()}">
-            ${item.type === 'SALE' ? '+₦' : '-₦'}${item.amount.toLocaleString()}
-          </div>
-          <span style="font-size:0.68rem; font-weight:800; padding:0.2rem 0.55rem; border-radius:var(--radius-full); text-transform:uppercase; background:${item.type === 'SALE' ? 'var(--ng-green-pill-bg)' : '#fee2e2'}; color:${item.type === 'SALE' ? 'var(--ng-green-main)' : '#dc2626'};">
-            ${item.type}
-          </span>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  startTransactionFlow(type) {
-    sound.playTap();
-    this.currentTxContext = {
-      type,
-      amount: 0,
-      beneficiary: ''
+  initDOM() {
+    this.views = {
+      login: document.getElementById('view-login'),
+      register: document.getElementById('view-register'),
+      otp: document.getElementById('view-otp'),
+      menu: document.getElementById('view-menu'),
+      business: document.getElementById('view-business'),
+      history: document.getElementById('view-history'),
+      profile: document.getElementById('view-profile')
     };
 
-    const titleElem = document.getElementById('amount-view-title');
-    if (titleElem) titleElem.textContent = store.getTypeTitle(type);
+    this.modals = {
+      recordSale: document.getElementById('modal-record-sale'),
+      addExpense: document.getElementById('modal-add-expense')
+    };
 
-    const extraForm = document.getElementById('amount-extra-inputs');
-    if (extraForm) {
-      if (type === 'TRANSFER') {
-        extraForm.innerHTML = `
-          <div class="field-group-exact">
-            <label class="field-label-exact">SELECT DESTINATION BANK</label>
-            <div class="field-input-box-exact">
-              <select class="form-select" id="input-transfer-bank" style="width:100%; background:none; border:none; color:var(--text-dark); font-family:var(--font-main); font-weight:700; outline:none;">
-                <option value="GTBank">GTBank (Guaranty Trust)</option>
-                <option value="Access Bank">Access Bank</option>
-                <option value="Zenith Bank">Zenith Bank</option>
-                <option value="First Bank">First Bank of Nigeria</option>
-                <option value="UBA">UBA (United Bank for Africa)</option>
-                <option value="OPay">OPay Wallet / Merchant</option>
-                <option value="Moniepoint">Moniepoint MFB</option>
-              </select>
-            </div>
-          </div>
-          <div class="field-group-exact">
-            <label class="field-label-exact">ACCOUNT NUMBER</label>
-            <div class="field-input-box-exact">
-              <input type="tel" id="input-transfer-acct" placeholder="Enter 10-digit NUBAN" maxlength="10" value="0129384812" />
-            </div>
-          </div>
-        `;
-        extraForm.style.display = 'block';
-      } else if (type === 'AIRTIME') {
-        extraForm.innerHTML = `
-          <div class="field-group-exact">
-            <label class="field-label-exact">NETWORK PROVIDER</label>
-            <div class="field-input-box-exact">
-              <select class="form-select" id="input-bill-provider" style="width:100%; background:none; border:none; color:var(--text-dark); font-family:var(--font-main); font-weight:700; outline:none;">
-                <option value="MTN">MTN Nigeria</option>
-                <option value="Airtel">Airtel Nigeria</option>
-                <option value="Glo">Globacom (Glo)</option>
-                <option value="9mobile">9mobile</option>
-              </select>
-            </div>
-          </div>
-          <div class="field-group-exact">
-            <label class="field-label-exact">PHONE NUMBER</label>
-            <div class="field-input-box-exact">
-              <input type="tel" id="input-bill-target" placeholder="Recipient Phone Number" value="08031234567" />
-            </div>
-          </div>
-        `;
-        extraForm.style.display = 'block';
-      } else {
-        extraForm.style.display = 'none';
-        extraForm.innerHTML = '';
-      }
-    }
-
-    this.amountKeypad.reset();
-    this.showView('amount');
+    this.toastElem = document.getElementById('pos-toast');
   }
 
-  proceedToConfirmation() {
-    const amount = this.amountKeypad.getNumericValue();
-    if (amount <= 0) {
-      sound.playError();
-      this.showToast('Please enter an amount!');
-      return;
-    }
+  showView(viewName) {
+    Object.keys(this.views).forEach(key => {
+      if (this.views[key]) this.views[key].classList.remove('active');
+    });
 
-    sound.playTap();
-    this.currentTxContext.amount = amount;
+    if (this.views[viewName]) this.views[viewName].classList.add('active');
 
-    const bankSelect = document.getElementById('input-transfer-bank');
-    const acctInput = document.getElementById('input-transfer-acct');
-    const billProvider = document.getElementById('input-bill-provider');
-    const billTarget = document.getElementById('input-bill-target');
+    if (viewName === 'profile') this.renderProfileScreen();
+    else if (viewName === 'menu') this.renderDashboard();
 
-    if (bankSelect && acctInput) {
-      this.currentTxContext.beneficiary = `${acctInput.value} (${bankSelect.value})`;
-    } else if (billProvider && billTarget) {
-      this.currentTxContext.beneficiary = `${billProvider.value} - ${billTarget.value}`;
-    } else {
-      this.currentTxContext.beneficiary = 'Customer Walk-in (Terminal POS)';
-    }
+    const homeBtn = document.getElementById('nav-btn-home');
+    const bizBtn = document.getElementById('nav-btn-business');
+    const histBtn = document.getElementById('nav-btn-history');
+    const profBtn = document.getElementById('nav-btn-profile');
 
-    this.renderConfirmationScreen();
-    this.showView('confirm');
+    if (homeBtn) homeBtn.classList.toggle('active', viewName === 'menu');
+    if (bizBtn) bizBtn.classList.toggle('active', viewName === 'business');
+    if (histBtn) histBtn.classList.toggle('active', viewName === 'history');
+    if (profBtn) profBtn.classList.toggle('active', viewName === 'profile');
   }
 
-  renderConfirmationScreen() {
-    const { type, amount, beneficiary } = this.currentTxContext;
-    const feeInfo = store.calculateFees(type, amount);
-
-    const instructionElem = document.getElementById('confirm-plain-instruction');
-    let plainMsg = '';
-    if (type === 'CASHOUT' || type === 'CARD') {
-      plainMsg = `Hand ₦${amount.toLocaleString()} Cash to Customer`;
-    } else if (type === 'TRANSFER') {
-      plainMsg = `Transfer ₦${amount.toLocaleString()} to ${beneficiary}`;
-    } else {
-      plainMsg = `Top up ₦${amount.toLocaleString()} for ${beneficiary}`;
-    }
-
-    if (instructionElem) instructionElem.textContent = plainMsg;
-
-    const tableElem = document.getElementById('confirm-breakdown-table');
-    if (tableElem) {
-      tableElem.innerHTML = `
-        <div class="breakdown-row">
-          <span>Transaction Type:</span>
-          <span class="val">${store.getTypeTitle(type)}</span>
-        </div>
-        <div class="breakdown-row">
-          <span>Target / Recipient:</span>
-          <span class="val">${beneficiary}</span>
-        </div>
-        <div class="breakdown-row">
-          <span>Principal Amount:</span>
-          <span class="val" style="color:var(--ng-green-main); font-size:1.15rem;">₦${amount.toLocaleString()}</span>
-        </div>
-        <div class="breakdown-row">
-          <span>Agent Convenience Fee:</span>
-          <span class="val">₦${feeInfo.fee.toLocaleString()}</span>
-        </div>
-        <div class="breakdown-row">
-          <span>Agent Profit/Commission:</span>
-          <span class="val" style="color:var(--ng-green-main);">+₦${feeInfo.commission.toLocaleString()}</span>
-        </div>
-        <div class="breakdown-row total-row">
-          <span>Total Customer Charge:</span>
-          <span class="val" style="color:var(--ng-green-main);">₦${feeInfo.totalCustomerPay.toLocaleString()}</span>
-        </div>
-      `;
-    }
-
-    const thumb = document.getElementById('confirm-slide-thumb');
-    if (thumb) thumb.style.transform = 'translateX(0px)';
+  showToast(message) {
+    if (!this.toastElem) return;
+    this.toastElem.innerHTML = `<span>⚡</span> <span>${message}</span>`;
+    this.toastElem.classList.add('show');
+    setTimeout(() => {
+      this.toastElem.classList.remove('show');
+    }, 2500);
   }
 
-  proceedToPinAuth() {
-    sound.playTap();
-    this.authPinKeypad.reset();
-    this.showView('pin');
-  }
+  // OTP digit box auto-advance / backspace / paste logic
+  initOtpBoxes() {
+    const ids = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'];
+    const boxes = ids.map(id => document.getElementById(id)).filter(Boolean);
 
-  renderSuccessScreen() {
-    if (!this.activeTxResult) return;
-    const container = document.getElementById('thermal-receipt-container');
-    receiptManager.renderThermalReceipt(this.activeTxResult, container);
-  }
-
-  renderHistoryScreen(filter = 'ALL') {
-    const listElem = document.getElementById('history-items-container');
-    if (!listElem) return;
-
-    let items = store.transactions;
-    if (filter !== 'ALL') {
-      items = items.filter(t => t.status === filter || t.type === filter);
-    }
-
-    if (items.length === 0) {
-      listElem.innerHTML = `
-        <div style="text-align:center; padding:3rem 1rem; color:var(--text-muted); background:var(--surface-white); border-radius:var(--radius-lg);">
-          <div style="font-size:2.5rem; margin-bottom:0.5rem;">📭</div>
-          <div style="font-weight:700;">No transactions found</div>
-        </div>
-      `;
-      return;
-    }
-
-    listElem.innerHTML = items.map(tx => `
-      <div class="history-item" data-id="${tx.id}">
-        <div class="history-left">
-          <div class="history-icon-circle">
-            ${tx.type === 'CASHOUT' ? '💼' : tx.type === 'TRANSFER' ? '🔄' : tx.type === 'CARD' ? '💳' : '📱'}
-          </div>
-          <div>
-            <div class="history-title">${tx.title}</div>
-            <div class="history-time">${receiptManager.formatDate(tx.timestamp)}</div>
-          </div>
-        </div>
-        <div style="text-align:right;">
-          <div class="history-amount">₦${tx.amount.toLocaleString()}</div>
-          <span class="status-badge ${tx.status.toLowerCase()}">${tx.status}</span>
-        </div>
-      </div>
-    `).join('');
-
-    listElem.querySelectorAll('.history-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const id = el.getAttribute('data-id');
-        const tx = store.transactions.find(t => t.id === id);
-        if (tx) {
-          this.openTxDetailsModal(tx);
+    boxes.forEach((box, idx) => {
+      box.addEventListener('input', () => {
+        const val = box.value.replace(/\D/g, '');
+        box.value = val.slice(-1);
+        if (val) {
+          box.classList.add('filled');
+          if (idx < boxes.length - 1) boxes[idx + 1].focus();
+        } else {
+          box.classList.remove('filled');
         }
+      });
+
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !box.value && idx > 0) {
+          boxes[idx - 1].value = '';
+          boxes[idx - 1].classList.remove('filled');
+          boxes[idx - 1].focus();
+        }
+      });
+
+      box.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+        pasted.split('').slice(0, 6).forEach((ch, i) => {
+          if (boxes[i]) {
+            boxes[i].value = ch;
+            boxes[i].classList.add('filled');
+          }
+        });
+        boxes[Math.min(pasted.length, 5)].focus();
       });
     });
   }
 
-  openTxDetailsModal(tx) {
-    sound.playTap();
-    const container = document.getElementById('modal-details-receipt-box');
-    if (container) {
-      receiptManager.renderThermalReceipt(tx, container);
-    }
-    const modal = this.modals.details;
-    if (modal) modal.classList.add('active');
+  // 60-second countdown for OTP resend button
+  startOtpTimer() {
+    clearInterval(this._otpTimerInterval);
+    const btn = document.getElementById('btn-resend-otp');
+    const countEl = document.getElementById('otp-timer-count');
+    if (!btn || !countEl) return;
 
-    const printBtn = document.getElementById('btn-modal-reprint');
-    const waBtn = document.getElementById('btn-modal-whatsapp');
-    const copyBtn = document.getElementById('btn-modal-copy');
+    let seconds = 60;
+    btn.disabled = true;
+    countEl.textContent = seconds;
+    btn.textContent = `Resend in ${seconds}s`;
 
-    if (printBtn) printBtn.onclick = () => receiptManager.printReceipt();
-    if (waBtn) waBtn.onclick = () => receiptManager.shareWhatsApp(tx);
-    if (copyBtn) copyBtn.onclick = () => receiptManager.copyReceiptText(tx, (m) => this.showToast(m));
+    this._otpTimerInterval = setInterval(() => {
+      seconds--;
+      if (seconds <= 0) {
+        clearInterval(this._otpTimerInterval);
+        btn.disabled = false;
+        btn.textContent = 'Resend OTP';
+      } else {
+        btn.textContent = `Resend in ${seconds}s`;
+      }
+    }, 1000);
   }
 
   initEventListeners() {
-    // 1. Login Actions
+    // 1. Login
     const performLogin = async () => {
       const phoneInput = document.getElementById('login-phone-input')?.value.trim();
       const pinInput = document.getElementById('login-pin-input')?.value.trim();
@@ -800,40 +400,12 @@ class POSApp {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Incorrect phone or PIN');
 
-        const user = data.user;
-
-        // If this device already has local demo/wallet data for this account, restore it.
-        // Otherwise (new device, or cleared storage) bootstrap a fresh local profile —
-        // real sales/expenses still live safely in Supabase either way.
-        const localMatch = store.accounts.find(a =>
-          (a.phone || '').replace(/\s+/g, '') === (user.phone || '').replace(/\s+/g, '')
-        );
-
-        if (localMatch) {
-          store.setActiveAccount(localMatch);
-        } else {
-          const tillP1 = Math.floor(1000 + Math.random() * 9000);
-          const tillP2 = Math.floor(1000 + Math.random() * 9000);
-          const tillP3 = Math.floor(10 + Math.random() * 90);
-          store.createAccount({
-            name: user.name,
-            biz: user.business_name || user.name,
-            phone: user.phone,
-            email: user.email,
-            pin: pinInput,
-            tillNumber: `${tillP1} ${tillP2} ${tillP3}`,
-            tillName: `${user.business_name || user.name} Concept`
-          });
-        }
-
-        store.currentUserId = user.id;
-        store.persist();
+        store.setSignedInUser(data.user);
 
         sound.playSuccess();
         this.showToast('Welcome back, ' + (store.agentBusiness || store.agentName || 'Agent'));
         this.renderDashboard();
         this.renderProfileScreen();
-        this.renderBusinessScreen('ALL');
         this.showView('menu');
         this.loadLedgerFromBackend();
       } catch (err) {
@@ -897,17 +469,14 @@ class POSApp {
         return;
       }
 
-      // Save pending data
       this._pendingRegData = { name, biz, phone, email, pin };
 
-      // Update OTP screen masked contact info
       const maskedEmail = email.replace(/(.{1}).+(@.+)/, '$1***$2');
       document.getElementById('otp-masked-email').textContent = maskedEmail;
 
-      // Clear any previous digit inputs
-      ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+      ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
+        if (el) { el.value = ''; el.classList.remove('filled','error'); }
       });
 
       sound.playTap();
@@ -937,19 +506,17 @@ class POSApp {
       }
     });
 
-    // OTP digit auto-advance logic
     this.initOtpBoxes();
 
-    // Back from OTP → back to register
     document.getElementById('btn-back-from-otp')?.addEventListener('click', () => {
       sound.playTap();
       clearInterval(this._otpTimerInterval);
       this.showView('register');
     });
 
-    // Verify OTP → finalize account creation
+    // Verify OTP → finalize real account creation
     document.getElementById('btn-submit-otp')?.addEventListener('click', async () => {
-      const entered = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6']
+      const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
         .map(id => document.getElementById(id)?.value || '')
         .join('');
 
@@ -987,46 +554,26 @@ class POSApp {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Incorrect OTP');
 
-        // OTP correct and real account created in Supabase — set up local device state too
         clearInterval(this._otpTimerInterval);
-        const { name, biz, phone, email, pin } = this._pendingRegData;
-        const tillP1 = Math.floor(1000 + Math.random() * 9000);
-        const tillP2 = Math.floor(1000 + Math.random() * 9000);
-        const tillP3 = Math.floor(10 + Math.random() * 90);
-        const generatedTill = `${tillP1} ${tillP2} ${tillP3}`;
+        store.setSignedInUser(data.user);
 
-        store.createAccount({
-          name,
-          biz,
-          phone,
-          email,
-          pin,
-          tillNumber: generatedTill,
-          tillName: `${biz} Concept`
-        });
-
-        // Tie this device to the real backend account
-        store.currentUserId = data.user.id;
-        store.persist();
-
-        // Update login phone input so user can quickly re-login
         const loginPhone = document.getElementById('login-phone-input');
-        if (loginPhone) loginPhone.value = phone;
+        if (loginPhone) loginPhone.value = data.user.phone;
 
         sound.playSuccess();
-        this.showToast(`🎉 Account created! Welcome, ${biz}`);
+        this.showToast(`🎉 Account created! Welcome, ${data.user.business_name || data.user.name}`);
         this.renderDashboard();
         this.renderProfileScreen();
-        this.renderBusinessScreen('ALL');
         this.showView('menu');
         this._pendingRegData = null;
+        this.loadLedgerFromBackend();
       } catch (err) {
         sound.playError();
-        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           document.getElementById(id)?.classList.add('error');
         });
         setTimeout(() => {
-          ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+          ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { el.value = ''; el.classList.remove('error'); }
           });
@@ -1039,7 +586,6 @@ class POSApp {
       }
     });
 
-    // Resend OTP button
     document.getElementById('btn-resend-otp')?.addEventListener('click', async () => {
       if (!this._pendingRegData) return;
       sound.playTap();
@@ -1055,9 +601,9 @@ class POSApp {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to resend OTP');
 
-        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           const el = document.getElementById(id);
-          if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
+          if (el) { el.value = ''; el.classList.remove('filled','error'); }
         });
         this.showToast('New OTP sent to your email!');
         this.startOtpTimer();
@@ -1068,14 +614,14 @@ class POSApp {
       }
     });
 
-    // Dashboard Header Agent Profile Click
+    // Dashboard Header → Profile
     document.querySelector('.agent-profile-exact')?.addEventListener('click', () => {
       sound.playTap();
       this.renderProfileScreen();
       this.showView('profile');
     });
 
-    // PIN Peek Toggle
+    // PIN Peek Toggle (login form)
     document.getElementById('btn-toggle-pin-peek')?.addEventListener('click', () => {
       sound.playTap();
       const pinInput = document.getElementById('login-pin-input');
@@ -1085,30 +631,12 @@ class POSApp {
       }
     });
 
-    // Forgot PIN link
     document.getElementById('link-forgot-pin')?.addEventListener('click', () => {
       sound.playTap();
       this.showToast('Enter your registered phone number and PIN to sign in.');
     });
 
-    // 4. Dashboard Copy Till Number
-    document.getElementById('btn-copy-till')?.addEventListener('click', async () => {
-      sound.playTap();
-      const till = store.tillNumber;
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(till.replace(/\s+/g, ''));
-      }
-      this.showToast(`Till copied: ${till}`);
-      sound.speak('Till number ' + till.split('').join(' '));
-    });
-
-    // 5. 2x2 Action Tiles
-    document.getElementById('tile-withdrawal')?.addEventListener('click', () => this.startTransactionFlow('CASHOUT'));
-    document.getElementById('tile-transfer')?.addEventListener('click', () => this.startTransactionFlow('TRANSFER'));
-    document.getElementById('tile-card')?.addEventListener('click', () => this.startTransactionFlow('CARD'));
-    document.getElementById('tile-airtime')?.addEventListener('click', () => this.startTransactionFlow('AIRTIME'));
-
-    // 6. Bottom Navigation Items
+    // Bottom Navigation
     document.getElementById('nav-btn-home')?.addEventListener('click', () => {
       sound.playTap();
       this.showView('menu');
@@ -1144,22 +672,16 @@ class POSApp {
       this.showView('profile');
     });
 
-    // 7. Back Navigation Buttons
+    document.getElementById('btn-home-view-all')?.addEventListener('click', () => {
+      sound.playTap();
+      this.renderBusinessScreen('ALL');
+      this.showView('business');
+    });
+
+    // Back buttons
     document.getElementById('btn-back-from-business')?.addEventListener('click', () => {
       sound.playTap();
       this.showView('menu');
-    });
-    document.getElementById('btn-back-from-amount')?.addEventListener('click', () => {
-      sound.playTap();
-      this.showView('menu');
-    });
-    document.getElementById('btn-back-from-confirm')?.addEventListener('click', () => {
-      sound.playTap();
-      this.showView('amount');
-    });
-    document.getElementById('btn-back-from-pin')?.addEventListener('click', () => {
-      sound.playTap();
-      this.showView('confirm');
     });
     document.getElementById('btn-back-from-history')?.addEventListener('click', () => {
       sound.playTap();
@@ -1170,16 +692,20 @@ class POSApp {
       this.showView('menu');
     });
 
-    // 8. Business Bookkeeping Modal Openers & Submissions
-    document.getElementById('btn-open-record-sale')?.addEventListener('click', () => {
-      sound.playTap();
-      this.resetSaleModal();
-      this.modals.recordSale.classList.add('active');
+    // Record Sale / Add Expense modal openers (shared by Home + Business tab buttons)
+    document.querySelectorAll('.btn-trigger-record-sale').forEach(btn => {
+      btn.addEventListener('click', () => {
+        sound.playTap();
+        this.resetSaleModal();
+        this.modals.recordSale.classList.add('active');
+      });
     });
 
-    document.getElementById('btn-open-add-expense')?.addEventListener('click', () => {
-      sound.playTap();
-      this.modals.addExpense.classList.add('active');
+    document.querySelectorAll('.btn-trigger-add-expense').forEach(btn => {
+      btn.addEventListener('click', () => {
+        sound.playTap();
+        this.modals.addExpense.classList.add('active');
+      });
     });
 
     // Add a new blank item row
@@ -1193,13 +719,11 @@ class POSApp {
       this.recalcSaleTotals();
     });
 
-    // Remove a row (event delegation) and live-recalculate totals as fields change
     document.getElementById('sale-items-list')?.addEventListener('click', (e) => {
       if (e.target.closest('.btn-remove-item-row')) {
         const list = document.getElementById('sale-items-list');
         const rows = list.querySelectorAll('.sale-item-row');
         if (rows.length <= 1) {
-          // Keep at least one row — just clear it instead of removing
           const row = e.target.closest('.sale-item-row');
           row.querySelector('.sale-item-name').value = '';
           row.querySelector('.sale-item-qty').value = '1';
@@ -1217,7 +741,7 @@ class POSApp {
     document.getElementById('btn-submit-record-sale')?.addEventListener('click', async () => {
       const items = this.collectSaleItems();
       const note = document.getElementById('sale-note-input')?.value.trim();
-      const { subtotal, total, taxRatePercent } = this.recalcSaleTotals();
+      const { total, taxRatePercent } = this.recalcSaleTotals();
 
       if (items.length === 0) {
         sound.playError();
@@ -1315,88 +839,32 @@ class POSApp {
       }
     });
 
-    // Business Filter Pills
+    // Business tab filter pills
     document.querySelectorAll('.biz-filter-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         sound.playTap();
         document.querySelectorAll('.biz-filter-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
-        const filter = pill.getAttribute('data-filter');
-        this.renderBusinessScreen(filter);
+        this.renderBusinessScreen(pill.getAttribute('data-filter'));
       });
     });
 
-    // 9. Keypad Handlers
-    document.querySelectorAll('.key-btn-ey[data-digit]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const digit = btn.getAttribute('data-digit');
-        const keypadType = btn.closest('[data-keypad-context]')?.getAttribute('data-keypad-context');
-        if (keypadType === 'auth-pin') {
-          this.authPinKeypad.handleDigit(digit);
-        } else {
-          this.amountKeypad.handleDigit(digit);
-        }
-      });
-    });
-
-    document.querySelectorAll('.key-btn-ey[data-action="backspace"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const keypadType = btn.closest('[data-keypad-context]')?.getAttribute('data-keypad-context');
-        if (keypadType === 'auth-pin') this.authPinKeypad.handleBackspace();
-        else this.amountKeypad.handleBackspace();
-      });
-    });
-
-    document.querySelectorAll('.key-btn-ey[data-action="clear"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const keypadType = btn.closest('[data-keypad-context]')?.getAttribute('data-keypad-context');
-        if (keypadType === 'auth-pin') this.authPinKeypad.handleClear();
-        else this.amountKeypad.handleClear();
-      });
-    });
-
-    // 10. Amount Presets
-    document.querySelectorAll('.preset-chip-ey[data-preset]').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const preset = parseInt(chip.getAttribute('data-preset'), 10);
-        this.amountKeypad.setAmount(preset);
-      });
-    });
-
-    document.getElementById('btn-amount-continue')?.addEventListener('click', () => this.proceedToConfirmation());
-
-    // 11. Slide to Confirm
-    this.initSlideConfirm();
-
-    // 12. Receipt buttons
-    document.getElementById('btn-receipt-print')?.addEventListener('click', () => receiptManager.printReceipt());
-    document.getElementById('btn-receipt-whatsapp')?.addEventListener('click', () => {
-      if (this.activeTxResult) receiptManager.shareWhatsApp(this.activeTxResult);
-    });
-    document.getElementById('btn-receipt-copy')?.addEventListener('click', () => {
-      if (this.activeTxResult) receiptManager.copyReceiptText(this.activeTxResult, (m) => this.showToast(m));
-    });
-    document.getElementById('btn-new-sale-done')?.addEventListener('click', () => {
-      sound.playTap();
-      this.renderDashboard();
-      this.showView('menu');
-    });
-
-    // 13. History Filter
+    // History tab filter pills
     document.querySelectorAll('.history-filter-pill').forEach(pill => {
       pill.addEventListener('click', () => {
         sound.playTap();
         document.querySelectorAll('.history-filter-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
-        const filter = pill.getAttribute('data-filter');
-        this.renderHistoryScreen(filter);
+        this.renderHistoryScreen(pill.getAttribute('data-filter'));
       });
     });
 
-    // 14. Profile Logout
+    // Profile Logout — clears the real session, not just the screen
     document.getElementById('btn-profile-logout')?.addEventListener('click', () => {
       sound.playTap();
-      this.showToast('Terminal Locked');
+      store.signOut();
+      this.ledgerEntries = [];
+      this.showToast('Signed out');
       this.showView('login');
     });
 
@@ -1407,52 +875,6 @@ class POSApp {
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
       });
     });
-  }
-
-  initSlideConfirm() {
-    const slider = document.getElementById('confirm-slide-wrapper');
-    const thumb = document.getElementById('confirm-slide-thumb');
-    if (!slider || !thumb) return;
-
-    let isDragging = false;
-    let startX = 0;
-    let maxDistance = 0;
-
-    const onStart = (clientX) => {
-      isDragging = true;
-      startX = clientX;
-      maxDistance = slider.offsetWidth - thumb.offsetWidth - 8;
-    };
-
-    const onMove = (clientX) => {
-      if (!isDragging) return;
-      const delta = clientX - startX;
-      const clamped = Math.max(0, Math.min(delta, maxDistance));
-      thumb.style.transform = `translateX(${clamped}px)`;
-
-      if (clamped >= maxDistance * 0.9) {
-        isDragging = false;
-        thumb.style.transform = `translateX(${maxDistance}px)`;
-        sound.playTap();
-        setTimeout(() => {
-          this.proceedToPinAuth();
-        }, 150);
-      }
-    };
-
-    const onEnd = () => {
-      if (!isDragging) return;
-      isDragging = false;
-      thumb.style.transform = 'translateX(0px)';
-    };
-
-    thumb.addEventListener('touchstart', (e) => onStart(e.touches[0].clientX));
-    window.addEventListener('touchmove', (e) => onMove(e.touches[0].clientX));
-    window.addEventListener('touchend', onEnd);
-
-    thumb.addEventListener('mousedown', (e) => onStart(e.clientX));
-    window.addEventListener('mousemove', (e) => onMove(e.clientX));
-    window.addEventListener('mouseup', onEnd);
   }
 }
 

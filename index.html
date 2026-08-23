@@ -290,95 +290,41 @@
           </div>
         </header>
 
-        <!-- Dashboard Responsive Split: Till Card (Left) & Transaction Grid (Right on wide screen) -->
-        <div class="dashboard-grid-layout">
-          <!-- Hero Till Card -->
-          <div class="till-card-white-exact">
-            <div class="till-header-row-exact">
-              <span class="till-label-exact">TILL NUMBER</span>
-              <button type="button" id="btn-copy-till" class="till-copy-btn-exact">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-                <span>Copy</span>
-              </button>
-            </div>
-
-            <div class="till-number-display-exact" id="till-number-val">5538 9535 44</div>
-            <div class="till-merchant-name-exact" id="till-merchant-val">Ever Young Business Concept</div>
-
-            <div>
-              <div class="balance-label-exact">Available balance</div>
-              <div class="balance-amount-green-exact" id="dashboard-balance-val">₦128,450.00</div>
-            </div>
+        <!-- 3 Metrics Overview Card -->
+        <div class="business-overview-grid">
+          <div class="biz-metric-card">
+            <div class="biz-metric-label"><span>📈</span> Total Sales</div>
+            <div class="biz-metric-val sales" id="home-total-sales">₦0.00</div>
           </div>
 
-          <!-- Transaction Cards -->
-          <div>
-            <div class="section-title-exact">TRANSACTIONS</div>
+          <div class="biz-metric-card">
+            <div class="biz-metric-label"><span>📉</span> Total Expenses</div>
+            <div class="biz-metric-val expenses" id="home-total-expenses">₦0.00</div>
+          </div>
 
-            <div class="transactions-grid-exact">
-              <!-- 1. Withdrawal -->
-              <div class="tile-card-white-exact" id="tile-withdrawal" role="button" tabindex="0">
-                <div class="tile-bubble-mint-exact">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="tile-title-exact">Withdrawal</div>
-                  <div class="tile-sub-exact">Cash out</div>
-                </div>
-              </div>
-
-              <!-- 2. Transfer -->
-              <div class="tile-card-white-exact" id="tile-transfer" role="button" tabindex="0">
-                <div class="tile-bubble-mint-exact">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 1l4 4-4 4"/>
-                    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                    <path d="M7 23l-4-4 4-4"/>
-                    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="tile-title-exact">Transfer</div>
-                  <div class="tile-sub-exact">Send funds</div>
-                </div>
-              </div>
-
-              <!-- 3. Card -->
-              <div class="tile-card-white-exact" id="tile-card" role="button" tabindex="0">
-                <div class="tile-bubble-mint-exact">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                    <line x1="1" y1="10" x2="23" y2="10"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="tile-title-exact">Card</div>
-                  <div class="tile-sub-exact">Pay with card</div>
-                </div>
-              </div>
-
-              <!-- 4. Airtime -->
-              <div class="tile-card-white-exact" id="tile-airtime" role="button" tabindex="0">
-                <div class="tile-bubble-mint-exact">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-                    <line x1="12" y1="18" x2="12.01" y2="18"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="tile-title-exact">Airtime</div>
-                  <div class="tile-sub-exact">Top up</div>
-                </div>
-              </div>
-            </div>
+          <div class="biz-metric-card">
+            <div class="biz-metric-label"><span>💰</span> Net Profit</div>
+            <div class="biz-metric-val profit" id="home-net-profit">₦0.00</div>
           </div>
         </div>
+
+        <!-- Quick Action Buttons: Record Sale & Add Expense -->
+        <div class="biz-actions-split">
+          <button type="button" class="btn-biz-action sale btn-trigger-record-sale">
+            <span>+</span> Record Sale
+          </button>
+          <button type="button" class="btn-biz-action expense btn-trigger-add-expense">
+            <span>-</span> Add Expense
+          </button>
+        </div>
+
+        <!-- Recent Entries Preview -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <span class="section-title-exact" style="margin-bottom:0;">Recent Entries</span>
+          <button type="button" id="btn-home-view-all" class="preset-chip-ey" style="padding:0.35rem 0.85rem; font-size:0.8rem;">View all →</button>
+        </div>
+
+        <div id="home-recent-entries-container"></div>
 
         <!-- Fixed Bottom Navigation Bar -->
         <nav class="bottom-nav-bar-exact">
@@ -451,10 +397,10 @@
 
         <!-- Quick Action Buttons: Record Sale & Add Expense -->
         <div class="biz-actions-split">
-          <button type="button" class="btn-biz-action sale" id="btn-open-record-sale">
+          <button type="button" class="btn-biz-action sale btn-trigger-record-sale" id="btn-open-record-sale">
             <span>+</span> Record Sale
           </button>
-          <button type="button" class="btn-biz-action expense" id="btn-open-add-expense">
+          <button type="button" class="btn-biz-action expense btn-trigger-add-expense" id="btn-open-add-expense">
             <span>-</span> Add Expense
           </button>
         </div>
@@ -516,185 +462,21 @@
       <!-- =========================================================================
            SCREEN 5: AMOUNT ENTRY (Adaptive Split: Left Info / Right Keypad on Expand)
            ========================================================================= -->
-      <section id="view-amount" class="app-view" aria-label="Amount Entry">
-        <header class="view-top-status-row" style="margin-bottom:1.5rem;">
-          <button type="button" id="btn-back-from-amount" class="nav-back-btn">←</button>
-          <h2 id="amount-view-title" style="font-size:1.35rem; font-weight:800; color:var(--text-dark);">Withdrawal</h2>
-          <div style="width:44px;"></div>
-        </header>
-
-        <!-- Side-by-Side Keypad Split Layout when Expanded -->
-        <div class="keypad-split-layout">
-          
-          <!-- Left Pane: Amount Hero & Presets -->
-          <div class="keypad-left-pane">
-            <div id="amount-extra-inputs" style="display:none;"></div>
-
-            <!-- Big Amount Display -->
-            <div class="amount-hero-box-ey">
-              <span class="amount-hero-label">Enter Transaction Amount</span>
-              <div class="amount-hero-row">
-                <span class="amount-symbol-ey">₦</span>
-                <span id="amount-digits-display" class="amount-value-ey">0</span>
-              </div>
-              <div id="amount-words-text" class="amount-words-ey">Zero Naira</div>
-            </div>
-
-            <!-- Quick Presets -->
-            <div class="presets-scroller-ey">
-              <button class="preset-chip-ey" data-preset="1000" data-set="true">₦1,000</button>
-              <button class="preset-chip-ey" data-preset="2000" data-set="true">₦2,000</button>
-              <button class="preset-chip-ey" data-preset="5000" data-set="true">₦5,000</button>
-              <button class="preset-chip-ey" data-preset="10000" data-set="true">₦10,000</button>
-              <button class="preset-chip-ey" data-preset="20000" data-set="true">₦20,000</button>
-            </div>
-          </div>
-
-          <!-- Right Pane: Numeric Keypad Grid & Action Button -->
-          <div class="keypad-right-pane">
-            <div class="keypad-grid-ey" data-keypad-context="amount">
-              <button class="key-btn-ey" data-digit="1">1</button>
-              <button class="key-btn-ey" data-digit="2">2<span class="key-sub">ABC</span></button>
-              <button class="key-btn-ey" data-digit="3">3<span class="key-sub">DEF</span></button>
-              <button class="key-btn-ey" data-digit="4">4<span class="key-sub">GHI</span></button>
-              <button class="key-btn-ey" data-digit="5">5<span class="key-sub">JKL</span></button>
-              <button class="key-btn-ey" data-digit="6">6<span class="key-sub">MNO</span></button>
-              <button class="key-btn-ey" data-digit="7">7<span class="key-sub">PQRS</span></button>
-              <button class="key-btn-ey" data-digit="8">8<span class="key-sub">TUV</span></button>
-              <button class="key-btn-ey" data-digit="9">9<span class="key-sub">WXYZ</span></button>
-              <button class="key-btn-ey special" data-digit="00">00</button>
-              <button class="key-btn-ey" data-digit="0">0</button>
-              <button class="key-btn-ey special" data-action="backspace">⌫</button>
-            </div>
-
-            <button type="button" id="btn-amount-continue" class="btn-primary-green-exact" style="opacity:0.5;" disabled>
-              Continue to Confirm →
-            </button>
-          </div>
-
-        </div>
-      </section>
-
       <!-- =========================================================================
-           SCREEN 6: CONFIRMATION SCREEN
-           ========================================================================= -->
-      <section id="view-confirm" class="app-view" aria-label="Confirmation Screen">
-        <div class="flow-centered-card">
-          <header class="view-top-status-row" style="margin-bottom:1.5rem;">
-            <button type="button" id="btn-back-from-confirm" class="nav-back-btn">←</button>
-            <h2 style="font-size:1.35rem; font-weight:800; color:var(--text-dark);">Confirm Transaction</h2>
-            <div style="width:44px;"></div>
-          </header>
-
-          <div class="plain-instruction-box">
-            <div class="instruction-tag">Action Requirement</div>
-            <div id="confirm-plain-instruction" class="instruction-bold-text">
-              Hand ₦10,000 Cash to Customer
-            </div>
-          </div>
-
-          <div id="confirm-breakdown-table" class="breakdown-table-card"></div>
-
-          <div style="margin-top:auto;">
-            <div class="slide-confirm-wrapper" id="confirm-slide-wrapper">
-              <span class="slide-confirm-text">Slide to Authorize →</span>
-              <div class="slide-thumb" id="confirm-slide-thumb">⚡</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- =========================================================================
-           SCREEN 7: PIN AUTHORIZATION
-           ========================================================================= -->
-      <section id="view-pin" class="app-view" aria-label="PIN Authorization">
-        <header class="view-top-status-row" style="margin-bottom:1.5rem;">
-          <button type="button" id="btn-back-from-pin" class="nav-back-btn">←</button>
-          <h2 style="font-size:1.35rem; font-weight:800; color:var(--text-dark);">Agent PIN</h2>
-          <div style="width:44px;"></div>
-        </header>
-
-        <div class="keypad-split-layout">
-          <!-- Left Pane: PIN Bubbles & Guidance -->
-          <div class="keypad-left-pane" style="background:var(--surface-white); padding:2rem 1.5rem; border-radius:var(--radius-xl); box-shadow:var(--card-shadow-lg); text-align:center;">
-            <div style="font-size:3rem; margin-bottom:0.5rem;">🔐</div>
-            <h3 style="font-size:1.5rem; font-weight:800; color:var(--text-dark);">Authorize Transaction</h3>
-            <p style="font-size:0.95rem; color:var(--text-muted); margin-top:0.25rem;">Enter your 4-digit security PIN to complete</p>
-
-            <div class="pin-row-ey" style="margin-top:2rem;">
-              <div class="pin-dot-ey auth-pin-bubble"></div>
-              <div class="pin-dot-ey auth-pin-bubble"></div>
-              <div class="pin-dot-ey auth-pin-bubble"></div>
-              <div class="pin-dot-ey auth-pin-bubble"></div>
-            </div>
-          </div>
-
-          <!-- Right Pane: PIN Keys -->
-          <div class="keypad-right-pane">
-            <div class="keypad-grid-ey" data-keypad-context="auth-pin">
-              <button class="key-btn-ey" data-digit="1">1</button>
-              <button class="key-btn-ey" data-digit="2">2<span class="key-sub">ABC</span></button>
-              <button class="key-btn-ey" data-digit="3">3<span class="key-sub">DEF</span></button>
-              <button class="key-btn-ey" data-digit="4">4<span class="key-sub">GHI</span></button>
-              <button class="key-btn-ey" data-digit="5">5<span class="key-sub">JKL</span></button>
-              <button class="key-btn-ey" data-digit="6">6<span class="key-sub">MNO</span></button>
-              <button class="key-btn-ey" data-digit="7">7<span class="key-sub">PQRS</span></button>
-              <button class="key-btn-ey" data-digit="8">8<span class="key-sub">TUV</span></button>
-              <button class="key-btn-ey" data-digit="9">9<span class="key-sub">WXYZ</span></button>
-              <button class="key-btn-ey special clear" data-action="clear">CLR</button>
-              <button class="key-btn-ey" data-digit="0">0</button>
-              <button class="key-btn-ey special" data-action="backspace">⌫</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- =========================================================================
-           SCREEN 8: SUCCESS & THERMAL RECEIPT
-           ========================================================================= -->
-      <section id="view-success" class="app-view" aria-label="Approved Receipt">
-        <div class="success-screen-wrapper">
-          <div class="success-badge-pop">✓</div>
-          <h2 class="success-hero-text">TRANSACTION APPROVED</h2>
-          <p class="success-sub-text">Core Network Authorization Success</p>
-
-          <div id="thermal-receipt-container" style="width:100%;"></div>
-
-          <div class="receipt-actions-grid">
-            <button type="button" id="btn-receipt-print" class="btn-receipt">
-              <span>🖨️</span> Print Slip
-            </button>
-            <button type="button" id="btn-receipt-whatsapp" class="btn-receipt whatsapp">
-              <span>💬</span> WhatsApp
-            </button>
-          </div>
-
-          <button type="button" id="btn-receipt-copy" class="btn-receipt" style="width:100%; margin-bottom:1rem;">
-            <span>📋</span> Copy RRN Reference
-          </button>
-
-          <button type="button" id="btn-new-sale-done" class="btn-primary-green-exact">
-            Next Transaction (Home) ↵
-          </button>
-        </div>
-      </section>
-
-      <!-- =========================================================================
-           SCREEN 9: TRANSACTION HISTORY
+           SCREEN 5: TRANSACTION HISTORY (full ledger — sales & expenses)
            ========================================================================= -->
       <section id="view-history" class="app-view" aria-label="Transaction History">
         <div style="width:100%; max-width:800px; margin:0 auto;">
           <header class="view-top-status-row" style="margin-bottom:1.5rem;">
             <button type="button" id="btn-back-from-history" class="nav-back-btn">←</button>
-            <h2 style="font-size:1.35rem; font-weight:800; color:var(--text-dark);">Transaction History</h2>
+            <h2 style="font-size:1.35rem; font-weight:800; color:var(--text-dark);">Full History</h2>
             <div style="width:44px;"></div>
           </header>
 
           <div style="display:flex; gap:0.5rem; margin-bottom:1rem; overflow-x:auto; padding-bottom:0.25rem;">
             <button class="preset-chip-ey history-filter-pill active" data-filter="ALL">All</button>
-            <button class="preset-chip-ey history-filter-pill" data-filter="SUCCESSFUL">Successful</button>
-            <button class="preset-chip-ey history-filter-pill" data-filter="CASHOUT">Withdrawal</button>
-            <button class="preset-chip-ey history-filter-pill" data-filter="TRANSFER">Transfer</button>
+            <button class="preset-chip-ey history-filter-pill" data-filter="SALE">Sales</button>
+            <button class="preset-chip-ey history-filter-pill" data-filter="EXPENSE">Expenses</button>
           </div>
 
           <div id="history-items-container"></div>
@@ -702,7 +484,7 @@
       </section>
 
       <!-- =========================================================================
-           SCREEN 10: AGENT PROFILE
+           SCREEN 6: AGENT PROFILE
            ========================================================================= -->
       <section id="view-profile" class="app-view" aria-label="Agent Profile">
         <div class="flow-centered-card">
@@ -715,7 +497,6 @@
           <div style="display:flex; flex-direction:column; align-items:center; padding:1rem 0 1.5rem;">
             <div class="agent-avatar-circle-exact" id="profile-avatar-circle" style="width:78px; height:78px; font-size:1.85rem; margin-bottom:0.85rem;">EY</div>
             <h3 style="font-size:1.5rem; font-weight:800; color:var(--text-dark);" id="profile-business-name">Ever Young Biz</h3>
-            <span style="color:var(--text-muted); font-size:0.95rem;" id="profile-terminal-id">Terminal ID: 5538 9535 44</span>
           </div>
 
           <div class="breakdown-table-card" style="margin-bottom:1.75rem;">
@@ -734,14 +515,6 @@
             <div class="breakdown-row">
               <span>Status:</span>
               <span class="val" style="color:var(--ng-green-main);" id="profile-agent-status">Active / Online</span>
-            </div>
-            <div class="breakdown-row">
-              <span>Merchant Name:</span>
-              <span class="val" id="profile-merchant-name">Ever Young Business Concept</span>
-            </div>
-            <div class="breakdown-row">
-              <span>Commission Tier:</span>
-              <span class="val" style="color:var(--ng-green-main);" id="profile-commission-tier">Super Agent (75%)</span>
             </div>
           </div>
 
@@ -764,36 +537,20 @@
         </div>
 
         <form id="form-record-sale" onsubmit="event.preventDefault();">
-          <div class="field-group-exact">
-            <label class="field-label-exact">ITEM / SERVICE SOLD</label>
+          <label class="field-label-exact" style="margin-bottom:0.5rem; display:block;">ITEMS SOLD</label>
+          <div id="sale-items-list"><!-- item rows injected by app.js --></div>
+
+          <button type="button" id="btn-add-sale-item" class="btn-add-item-row">+ Add another item</button>
+
+          <div class="field-group-exact" style="margin-top:1.1rem;">
+            <label class="field-label-exact">TAX / VAT % (OPTIONAL)</label>
             <div class="field-input-box-exact">
-              <span class="icon-lead">🏷️</span>
-              <input type="text" id="sale-title-input" placeholder="e.g. Soft Drinks, Cash transfer fee" required />
+              <span class="icon-lead">%</span>
+              <input type="number" id="sale-tax-rate-input" placeholder="0" min="0" max="100" step="0.5" />
             </div>
           </div>
 
           <div class="field-group-exact">
-            <label class="field-label-exact">CATEGORY</label>
-            <div class="field-input-box-exact">
-              <span class="icon-lead">📁</span>
-              <select id="sale-category-select">
-                <option value="Goods Sold">Goods & Retail Sold</option>
-                <option value="POS Commission">POS Service Fee</option>
-                <option value="Services">Services Rendered</option>
-                <option value="Other Income">Other Income</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="field-group-exact">
-            <label class="field-label-exact">SALE AMOUNT (₦)</label>
-            <div class="field-input-box-exact">
-              <span class="icon-lead" style="font-weight:800; color:var(--ng-green-main);">₦</span>
-              <input type="number" id="sale-amount-input" placeholder="0" min="1" required />
-            </div>
-          </div>
-
-          <div class="field-group-exact" style="margin-bottom:1.5rem;">
             <label class="field-label-exact">NOTE / CUSTOMER (OPTIONAL)</label>
             <div class="field-input-box-exact">
               <span class="icon-lead">📝</span>
@@ -801,8 +558,23 @@
             </div>
           </div>
 
+          <div class="breakdown-table-card">
+            <div class="breakdown-row">
+              <span>Subtotal</span>
+              <span class="val" id="sale-subtotal-display">₦0</span>
+            </div>
+            <div class="breakdown-row">
+              <span>Tax</span>
+              <span class="val" id="sale-tax-display">₦0</span>
+            </div>
+            <div class="breakdown-row total-row">
+              <span>Total</span>
+              <span class="val" id="sale-total-display">₦0</span>
+            </div>
+          </div>
+
           <button type="button" id="btn-submit-record-sale" class="btn-primary-green-exact">
-            + Save Sale (+₦)
+            + Save Sale
           </button>
         </form>
       </div>
@@ -862,31 +634,6 @@
             - Save Expense (-₦)
           </button>
         </form>
-      </div>
-    </div>
-
-    <!-- Modal Details / Reprint -->
-    <div id="modal-details" class="modal-overlay" aria-hidden="true">
-      <div class="modal-box">
-        <div class="modal-header-row">
-          <h3 class="modal-title">Receipt Details</h3>
-          <button class="modal-close-btn modal-backdrop-dismiss" aria-label="Close">✕</button>
-        </div>
-
-        <div id="modal-details-receipt-box" style="margin-bottom:1.25rem; max-height:400px; overflow-y:auto;"></div>
-
-        <div class="receipt-actions-grid">
-          <button id="btn-modal-reprint" class="btn-receipt" type="button">
-            <span>🖨️</span> Reprint
-          </button>
-          <button id="btn-modal-whatsapp" class="btn-receipt whatsapp" type="button">
-            <span>💬</span> WhatsApp
-          </button>
-        </div>
-
-        <button id="btn-modal-copy" class="btn-receipt" style="width:100%; margin-top:0.65rem;" type="button">
-          <span>📋</span> Copy Reference
-        </button>
       </div>
     </div>
 
