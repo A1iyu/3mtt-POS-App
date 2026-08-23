@@ -8,7 +8,7 @@ import { KeypadController } from './keypad.js';
 import { receiptManager } from './receipt.js';
 
 // URL of the deployed OTP backend (see /pos-otp-server). Update after deploying to Render.
-const API_BASE = 'https://YOUR-RENDER-APP.onrender.com';
+const API_BASE = 'https://your-render-app.onrender.com';
 
 class POSApp {
   constructor() {
@@ -176,7 +176,7 @@ class POSApp {
 
   // OTP digit box auto-advance / backspace / paste logic
   initOtpBoxes() {
-    const ids = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'];
+    const ids = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'];
     const boxes = ids.map(id => document.getElementById(id)).filter(Boolean);
 
     boxes.forEach((box, idx) => {
@@ -711,9 +711,9 @@ class POSApp {
       document.getElementById('otp-masked-email').textContent = maskedEmail;
 
       // Clear any previous digit inputs
-      ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+      ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) { el.value = ''; el.classList.remove('filled','error'); }
+        if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
       });
 
       sound.playTap();
@@ -755,7 +755,7 @@ class POSApp {
 
     // Verify OTP → finalize account creation
     document.getElementById('btn-submit-otp')?.addEventListener('click', async () => {
-      const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
+      const entered = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6']
         .map(id => document.getElementById(id)?.value || '')
         .join('');
 
@@ -828,11 +828,11 @@ class POSApp {
         this._pendingRegData = null;
       } catch (err) {
         sound.playError();
-        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
           document.getElementById(id)?.classList.add('error');
         });
         setTimeout(() => {
-          ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+          ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { el.value = ''; el.classList.remove('error'); }
           });
@@ -861,9 +861,9 @@ class POSApp {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to resend OTP');
 
-        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
           const el = document.getElementById(id);
-          if (el) { el.value = ''; el.classList.remove('filled','error'); }
+          if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
         });
         this.showToast('New OTP sent to your email!');
         this.startOtpTimer();
