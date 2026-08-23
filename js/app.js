@@ -43,15 +43,25 @@ class POSApp {
       const expensesData = await expensesRes.json();
 
       const sales = (salesData.sales || []).map(s => ({
+        id: s.id,
         type: 'SALE',
         title: (s.sale_items && s.sale_items[0] && s.sale_items[0].name) || 'Sale',
         category: s.sale_items && s.sale_items.length > 1 ? `${s.sale_items.length} items` : 'Goods Sold',
         amount: Number(s.total),
+        subtotal: Number(s.subtotal) || 0,
+        tax: Number(s.tax) || 0,
         note: s.note || '',
-        timestamp: s.created_at
+        timestamp: s.created_at,
+        items: (s.sale_items || []).map(it => ({
+          name: it.name,
+          quantity: Number(it.quantity) || 0,
+          unit: it.unit || 'pcs',
+          unitPrice: Number(it.unit_price) || 0
+        }))
       }));
 
       const expenses = (expensesData.expenses || []).map(e => ({
+        id: e.id,
         type: 'EXPENSE',
         title: e.category || 'Expense',
         category: e.category || 'General Expense',
@@ -89,7 +99,7 @@ class POSApp {
     }
 
     return entries.map(item => `
-      <div class="biz-ledger-item">
+      <div class="biz-ledger-item" data-entry-type="${item.type}" data-entry-id="${item.id}" role="button" tabindex="0">
         <div style="display:flex; align-items:center; gap:0.85rem;">
           <div class="biz-item-icon ${item.type.toLowerCase()}">
             ${item.type === 'SALE'
@@ -116,6 +126,137 @@ class POSApp {
         </div>
       </div>
     `).join('');
+  }
+
+  // ---- Entry detail modal (click a ledger row to see full breakdown) ----
+  findLedgerEntry(type, id) {
+    return this.ledgerEntries.find(e => e.type === type && String(e.id) === String(id));
+  }
+
+  openEntryDetail(type, id) {
+    const entry = this.findLedgerEntry(type, id);
+    if (!entry) return;
+
+    this._activeDetailEntry = entry;
+
+    const titleElem = document.getElementById('entry-detail-title');
+    const bodyElem = document.getElementById('entry-detail-body');
+    if (!titleElem || !bodyElem) return;
+
+    titleElem.textContent = entry.type === 'SALE' ? 'Sale Receipt' : 'Expense Details';
+
+    if (entry.type === 'SALE') {
+      const rows = (entry.items || []).map(it => `
+        <div class="breakdown-row">
+          <span>${it.name} <span style="color:var(--text-dim); font-weight:600;">(${it.quantity} ${it.unit})</span></span>
+          <span class="val">₦${(it.quantity * it.unitPrice).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+        </div>
+      `).join('');
+
+      bodyElem.innerHTML = `
+        <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">${receiptManager.formatDate(entry.timestamp)}</div>
+        <div class="breakdown-table-card" style="margin-bottom:1rem;">
+          ${rows || '<div class="breakdown-row"><span>No item detail saved for this sale</span></div>'}
+        </div>
+        <div class="breakdown-table-card">
+          <div class="breakdown-row">
+            <span>Subtotal</span>
+            <span class="val">₦${entry.subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div class="breakdown-row">
+            <span>Tax</span>
+            <span class="val">₦${entry.tax.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div class="breakdown-row total-row">
+            <span>Total</span>
+            <span class="val">₦${entry.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+        ${entry.note ? `<div style="margin-top:0.85rem; font-size:0.9rem; color:var(--text-muted);"><strong style="color:var(--text-dark);">Note:</strong> ${entry.note}</div>` : ''}
+      `;
+    } else {
+      bodyElem.innerHTML = `
+        <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">${receiptManager.formatDate(entry.timestamp)}</div>
+        <div class="breakdown-table-card">
+          <div class="breakdown-row">
+            <span>Category</span>
+            <span class="val">${entry.category}</span>
+          </div>
+          <div class="breakdown-row total-row">
+            <span>Amount</span>
+            <span class="val" style="color:#dc2626;">-₦${entry.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+        ${entry.note ? `<div style="margin-top:0.85rem; font-size:0.9rem; color:var(--text-muted);"><strong style="color:var(--text-dark);">Note:</strong> ${entry.note}</div>` : ''}
+      `;
+    }
+
+    this.modals.entryDetail?.classList.add('active');
+  }
+
+  // Opens a clean, standalone printable receipt in a new tab/window
+  printEntryReceipt(entry) {
+    if (!entry) return;
+    sound.playTap();
+
+    const merchant = (store.agentBusiness || store.agentName || '3MTT Agent POS').toUpperCase();
+    const isSale = entry.type === 'SALE';
+
+    const itemRows = isSale
+      ? (entry.items || []).map(it => `
+          <div class="receipt-row">
+            <span>${it.name} (${it.quantity} ${it.unit})</span>
+            <span>₦${(it.quantity * it.unitPrice).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+          </div>
+        `).join('')
+      : '';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Receipt</title>
+        <style>
+          body { font-family: 'Courier New', monospace; padding: 24px; color: #0f172a; max-width: 340px; margin: 0 auto; }
+          .center { text-align: center; }
+          .brand { font-size: 1.15rem; font-weight: 800; margin-bottom: 2px; }
+          .muted { color: #4b5563; font-size: 0.75rem; }
+          hr { border: none; border-top: 1px dashed #cbd5e1; margin: 10px 0; }
+          .receipt-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; }
+          .bold { font-weight: 800; font-size: 1rem; }
+          .footer { text-align: center; font-size: 0.7rem; color: #9ca3af; margin-top: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <div class="brand">${merchant}</div>
+          <div class="muted">${isSale ? 'SALES RECEIPT' : 'EXPENSE RECORD'}</div>
+          <div class="muted">${receiptManager.formatDate(entry.timestamp)}</div>
+        </div>
+        <hr>
+        ${isSale ? itemRows + '<hr>' : ''}
+        ${isSale ? `
+          <div class="receipt-row"><span>Subtotal</span><span>₦${entry.subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span></div>
+          <div class="receipt-row"><span>Tax</span><span>₦${entry.tax.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span></div>
+        ` : `
+          <div class="receipt-row"><span>Category</span><span>${entry.category}</span></div>
+        `}
+        <div class="receipt-row bold"><span>${isSale ? 'Total' : 'Amount'}</span><span>${isSale ? '' : '-'}₦${entry.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span></div>
+        ${entry.note ? `<hr><div class="muted">Note: ${entry.note}</div>` : ''}
+        <div class="footer">*** Thank you ***</div>
+        <script>window.onload = () => { window.print(); };</script>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=420,height=640');
+    if (!printWindow) {
+      this.showToast('Please allow pop-ups to print a receipt');
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
   }
 
   getLedgerStats(entries) {
@@ -204,9 +345,9 @@ class POSApp {
       <div class="sale-item-row" data-item-row>
         <div class="sale-item-row-fields">
           <input type="text" class="sale-item-name" placeholder="Item name" list="sale-item-suggestions" autocomplete="off" />
-          <input type="number" class="sale-item-qty" placeholder="Qty" min="0.01" step="any" value="1" />
-          <input type="text" class="sale-item-unit" placeholder="Unit (pcs)" list="sale-unit-suggestions" autocomplete="off" />
-          <input type="number" class="sale-item-price" placeholder="₦ Price / unit" min="0" step="0.01" />
+          <input type="number" class="sale-item-qty" placeholder="Quantity" min="0.01" step="any" value="1" />
+          <input type="text" class="sale-item-unit" placeholder="Unit (bag, kg, pcs)" list="sale-unit-suggestions" autocomplete="off" />
+          <input type="number" class="sale-item-price" placeholder="₦ Price per unit" min="0" step="0.01" />
         </div>
         <button type="button" class="btn-remove-item-row" aria-label="Remove item">✕</button>
       </div>
@@ -214,8 +355,9 @@ class POSApp {
   }
 
   // ---- Recently used sale items (device-local, so typing a few letters of
-  //      a previously recorded item name auto-suggests it and autofills its
-  //      last used unit + price) ----
+  //      a previously recorded item name auto-suggests it, and picking a
+  //      specific unit/size — e.g. "25kg bag" vs "50kg bag" — autofills that
+  //      exact variant's last used price, never a different size's price) ----
   loadRecentSaleItems() {
     try {
       const raw = localStorage.getItem('3mtt_pos_recent_sale_items_v1');
@@ -227,16 +369,19 @@ class POSApp {
 
   saveRecentSaleItems(items) {
     // items: array of {name, quantity, unit, unitPrice}
+    // Keyed by name+unit together, so "Rice / 25kg bag" and "Rice / 50kg bag"
+    // are remembered as separate variants with their own price.
     const existing = this.loadRecentSaleItems();
     items.forEach(({ name, unit, unitPrice }) => {
       if (!name) return;
-      const key = name.trim().toLowerCase();
-      const idx = existing.findIndex(it => it.name.toLowerCase() === key);
-      const entry = { name: name.trim(), unit: unit || 'pcs', unitPrice: unitPrice ?? '' };
+      const cleanUnit = (unit || 'pcs').trim();
+      const key = `${name.trim().toLowerCase()}|${cleanUnit.toLowerCase()}`;
+      const idx = existing.findIndex(it => `${it.name.toLowerCase()}|${it.unit.toLowerCase()}` === key);
+      const entry = { name: name.trim(), unit: cleanUnit, unitPrice: unitPrice ?? '' };
       if (idx > -1) existing.splice(idx, 1);
       existing.unshift(entry);
     });
-    const trimmed = existing.slice(0, 40);
+    const trimmed = existing.slice(0, 60);
     try {
       localStorage.setItem('3mtt_pos_recent_sale_items_v1', JSON.stringify(trimmed));
     } catch (e) { /* storage unavailable, safe to ignore */ }
@@ -246,24 +391,58 @@ class POSApp {
   populateSaleItemSuggestions(items = this.loadRecentSaleItems()) {
     const datalist = document.getElementById('sale-item-suggestions');
     if (!datalist) return;
-    datalist.innerHTML = items.map(it => `<option value="${it.name.replace(/"/g, '&quot;')}"></option>`).join('');
+    // One suggestion per distinct item name (not per variant) for the name field.
+    const seen = new Set();
+    const uniqueNames = items.filter(it => {
+      const key = it.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    datalist.innerHTML = uniqueNames.map(it => `<option value="${it.name.replace(/"/g, '&quot;')}"></option>`).join('');
   }
 
-  // If the typed/selected item name matches a previously recorded item,
-  // fill in its last used unit and price (only when those fields are empty).
+  // Once an item name is chosen, show that item's previously used sizes/units
+  // (e.g. "25kg bag", "50kg bag") alongside the generic unit list, so picking
+  // the right variant is a click, not a guess.
+  populateUnitSuggestionsForName(name) {
+    const datalist = document.getElementById('sale-unit-suggestions');
+    if (!datalist) return;
+
+    const genericUnits = ['pcs', 'kg', 'g', 'litre', 'ml', 'dozen', 'pack', 'bag', 'carton', 'bunch'];
+    const typed = name.trim().toLowerCase();
+    const knownForItem = typed
+      ? this.loadRecentSaleItems()
+          .filter(it => it.name.toLowerCase() === typed)
+          .map(it => it.unit)
+      : [];
+
+    const combined = [...new Set([...knownForItem, ...genericUnits])];
+    datalist.innerHTML = combined.map(u => `<option value="${u.replace(/"/g, '&quot;')}"></option>`).join('');
+  }
+
+  // Only autofill a price when BOTH the item name AND the specific unit/size
+  // match something recorded before — a name match alone is not enough,
+  // since the whole point is different sizes have different prices.
   autofillSaleItemRow(row) {
     const nameInput = row.querySelector('.sale-item-name');
     const unitInput = row.querySelector('.sale-item-unit');
     const priceInput = row.querySelector('.sale-item-price');
     if (!nameInput) return;
 
-    const typed = nameInput.value.trim().toLowerCase();
-    if (!typed) return;
+    const typedName = nameInput.value.trim().toLowerCase();
+    if (!typedName) return;
 
-    const match = this.loadRecentSaleItems().find(it => it.name.toLowerCase() === typed);
+    this.populateUnitSuggestionsForName(nameInput.value);
+
+    const typedUnit = (unitInput?.value || '').trim().toLowerCase();
+    if (!typedUnit) return; // wait until a specific size/unit is chosen before touching price
+
+    const match = this.loadRecentSaleItems().find(
+      it => it.name.toLowerCase() === typedName && it.unit.toLowerCase() === typedUnit
+    );
     if (!match) return;
 
-    if (unitInput && !unitInput.value.trim()) unitInput.value = match.unit || 'pcs';
     if (priceInput && !priceInput.value) priceInput.value = match.unitPrice || '';
     this.recalcSaleTotals();
   }
@@ -328,7 +507,8 @@ class POSApp {
 
     this.modals = {
       recordSale: document.getElementById('modal-record-sale'),
-      addExpense: document.getElementById('modal-add-expense')
+      addExpense: document.getElementById('modal-add-expense'),
+      entryDetail: document.getElementById('modal-entry-detail')
     };
 
     this.toastElem = document.getElementById('pos-toast');
@@ -766,10 +946,10 @@ class POSApp {
     document.getElementById('sale-items-list')?.addEventListener('input', () => this.recalcSaleTotals());
     document.getElementById('sale-tax-rate-input')?.addEventListener('input', () => this.recalcSaleTotals());
 
-    // When an item name matches something recorded before (typed or picked from
-    // suggestions), auto-fill its last used unit + price so re-entry is fast.
+    // When an item name/unit combo matches something recorded before (typed or
+    // picked from suggestions), auto-fill that exact variant's last used price.
     document.getElementById('sale-items-list')?.addEventListener('change', (e) => {
-      if (e.target.classList.contains('sale-item-name')) {
+      if (e.target.classList.contains('sale-item-name') || e.target.classList.contains('sale-item-unit')) {
         this.autofillSaleItemRow(e.target.closest('.sale-item-row'));
       }
     });
@@ -893,6 +1073,21 @@ class POSApp {
       this.ledgerEntries = [];
       this.showToast('Signed out');
       this.showView('login');
+    });
+
+    // Click a ledger row (Home preview or full History) to see full details
+    const openEntryDetailFromEvent = (e) => {
+      const row = e.target.closest('.biz-ledger-item');
+      if (!row) return;
+      sound.playTap();
+      this.openEntryDetail(row.getAttribute('data-entry-type'), row.getAttribute('data-entry-id'));
+    };
+    document.getElementById('home-recent-entries-container')?.addEventListener('click', openEntryDetailFromEvent);
+    document.getElementById('history-items-container')?.addEventListener('click', openEntryDetailFromEvent);
+
+    // Print Receipt button inside the entry detail modal
+    document.getElementById('btn-print-entry-receipt')?.addEventListener('click', () => {
+      this.printEntryReceipt(this._activeDetailEntry);
     });
 
     // Modal Close

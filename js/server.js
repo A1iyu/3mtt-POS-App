@@ -259,6 +259,52 @@ app.get('/api/expenses', async (req, res) => {
   res.json({ expenses: data });
 });
 
+// Permanently delete ALL sales (+ their items) and expenses for a user —
+// used by the "Clear All Sales & Expenses" button so an agent can start fresh.
+app.delete('/api/clear-all', async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+  try {
+    const { data: userSales, error: fetchErr } = await supabase
+      .from('sales')
+      .select('id')
+      .eq('user_id', userId);
+
+    if (fetchErr) {
+      console.error('clear-all: fetch sales error:', fetchErr);
+      return res.status(500).json({ error: 'Failed to look up sales to delete' });
+    }
+
+    const saleIds = (userSales || []).map(s => s.id);
+
+    if (saleIds.length > 0) {
+      const { error: itemsDelErr } = await supabase.from('sale_items').delete().in('sale_id', saleIds);
+      if (itemsDelErr) {
+        console.error('clear-all: delete sale_items error:', itemsDelErr);
+        return res.status(500).json({ error: 'Failed to clear sale items' });
+      }
+    }
+
+    const { error: salesDelErr } = await supabase.from('sales').delete().eq('user_id', userId);
+    if (salesDelErr) {
+      console.error('clear-all: delete sales error:', salesDelErr);
+      return res.status(500).json({ error: 'Failed to clear sales' });
+    }
+
+    const { error: expensesDelErr } = await supabase.from('expenses').delete().eq('user_id', userId);
+    if (expensesDelErr) {
+      console.error('clear-all: delete expenses error:', expensesDelErr);
+      return res.status(500).json({ error: 'Failed to clear expenses' });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('clear-all error:', err);
+    res.status(500).json({ error: 'Server error while clearing data' });
+  }
+});
+
 app.get('/', (req, res) => res.send('3MTT POS OTP service is running.'));
 
 const PORT = process.env.PORT || 3000;

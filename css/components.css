@@ -201,9 +201,18 @@
 .sale-item-row-fields {
   flex: 1;
   display: grid;
-  grid-template-columns: 1.8fr 0.7fr 0.85fr 1fr;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "name name"
+    "qty unit"
+    "price price";
   gap: 0.5rem;
 }
+
+.sale-item-row-fields .sale-item-name { grid-area: name; }
+.sale-item-row-fields .sale-item-qty { grid-area: qty; }
+.sale-item-row-fields .sale-item-unit { grid-area: unit; }
+.sale-item-row-fields .sale-item-price { grid-area: price; }
 
 .sale-item-row-fields input {
   height: 48px;
@@ -258,20 +267,6 @@
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-}
-
-@media (max-width: 480px) {
-  .sale-item-row-fields {
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "name name"
-      "qty unit"
-      "price price";
-  }
-  .sale-item-row-fields .sale-item-name { grid-area: name; }
-  .sale-item-row-fields .sale-item-qty { grid-area: qty; }
-  .sale-item-row-fields .sale-item-unit { grid-area: unit; }
-  .sale-item-row-fields .sale-item-price { grid-area: price; }
 }
 
 .pin-eye-toggle-btn {
@@ -754,6 +749,7 @@
   margin-bottom: 0.75rem;
   box-shadow: var(--card-shadow);
   transition: all var(--ease-fast);
+  cursor: pointer;
 }
 
 .biz-ledger-item:hover {

@@ -336,10 +336,12 @@
         <!-- Quick Action Buttons: Record Sale & Add Expense -->
         <div class="biz-actions-split">
           <button type="button" class="btn-biz-action sale btn-trigger-record-sale">
-            <span>+</span> Record Sale
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Record Sale
           </button>
           <button type="button" class="btn-biz-action expense btn-trigger-add-expense">
-            <span>-</span> Add Expense
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Expense
           </button>
         </div>
 
@@ -460,7 +462,10 @@
         </div>
 
         <form id="form-record-sale" onsubmit="event.preventDefault();">
-          <label class="field-label-exact" style="margin-bottom:0.5rem; display:block;">ITEMS SOLD</label>
+          <label class="field-label-exact" style="margin-bottom:0.35rem; display:block;">ITEMS SOLD</label>
+          <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.65rem;">
+            Subtotal = Quantity × Price per unit. Selling one 50kg bag for a flat ₦58,000? Enter Quantity <strong>1</strong>, Unit <strong>bag</strong>, Price <strong>58,000</strong> — not Quantity 50.
+          </p>
           <div id="sale-items-list"><!-- item rows injected by app.js --></div>
 
           <!-- Autocomplete suggestions for item names, filled from previously recorded sale items -->
@@ -583,6 +588,25 @@
             - Save Expense (-₦)
           </button>
         </form>
+      </div>
+    </div>
+
+    <!-- =========================================================================
+         MODAL 3: ENTRY DETAIL (Sale / Expense — full breakdown + Print Receipt)
+         ========================================================================= -->
+    <div id="modal-entry-detail" class="modal-overlay" aria-hidden="true">
+      <div class="modal-box">
+        <div class="modal-header-row">
+          <h3 class="modal-title" id="entry-detail-title">Entry Details</h3>
+          <button class="modal-close-btn modal-backdrop-dismiss" aria-label="Close">✕</button>
+        </div>
+
+        <div id="entry-detail-body"><!-- injected by app.js --></div>
+
+        <button type="button" id="btn-print-entry-receipt" class="btn-primary-green-exact" style="margin-top:1.25rem; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print Receipt
+        </button>
       </div>
     </div>
 
