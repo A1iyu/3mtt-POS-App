@@ -51,31 +51,31 @@
           <h1 class="auth-title-exact">Welcome back, Agent</h1>
           <p class="auth-subtitle-exact">Sign in to access your till and start transacting.</p>
 
-          <!-- Phone Number Field -->
+          <!-- Email or Phone Field -->
           <div class="field-group-exact">
-            <label class="field-label-exact">PHONE NUMBER</label>
+            <label class="field-label-exact">EMAIL OR PHONE NUMBER</label>
             <div class="field-input-box-exact">
               <span class="icon-lead">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                 </svg>
               </span>
-              <input type="tel" id="login-phone-input" placeholder="0801 234 5678" />
+              <input type="text" id="login-identifier-input" placeholder="agent@example.com or 0801 234 5678" />
             </div>
           </div>
 
-          <!-- PIN Field -->
+          <!-- Password Field -->
           <div class="field-group-exact">
-            <label class="field-label-exact">PIN</label>
-            <div class="field-input-box-exact" id="login-pin-field-box">
+            <label class="field-label-exact">PASSWORD</label>
+            <div class="field-input-box-exact" id="login-password-field-box">
               <span class="icon-lead">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </span>
-              <input type="password" id="login-pin-input" placeholder="••••" maxlength="4" />
-              <button type="button" class="pin-eye-toggle-btn" id="btn-toggle-pin-peek" aria-label="Toggle PIN Visibility">
+              <input type="password" id="login-password-input" placeholder="••••••••" />
+              <button type="button" class="pin-eye-toggle-btn" id="btn-toggle-pin-peek" aria-label="Toggle Password Visibility">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                   <circle cx="12" cy="12" r="3"/>
@@ -85,7 +85,7 @@
           </div>
 
           <div class="forgot-pin-row-exact">
-            <span class="forgot-pin-link-exact" id="link-forgot-pin">Forgot PIN?</span>
+            <span class="forgot-pin-link-exact" id="link-forgot-pin">Forgot password?</span>
           </div>
 
           <!-- Primary Sign In Button -->
@@ -183,7 +183,7 @@
           </div>
 
           <div class="field-group-exact">
-            <label class="field-label-exact">CREATE 4-DIGIT PIN</label>
+            <label class="field-label-exact">CREATE PASSWORD</label>
             <div class="field-input-box-exact">
               <span class="icon-lead">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -191,12 +191,12 @@
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </span>
-              <input type="password" id="reg-pin-input" placeholder="••••" maxlength="4" />
+              <input type="password" id="reg-password-input" placeholder="At least 6 characters" />
             </div>
           </div>
 
           <div class="field-group-exact" style="margin-bottom:1.5rem;">
-            <label class="field-label-exact">CONFIRM 4-DIGIT PIN</label>
+            <label class="field-label-exact">CONFIRM PASSWORD</label>
             <div class="field-input-box-exact">
               <span class="icon-lead">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -205,7 +205,27 @@
                   <path d="m9 16 2 2 4-4"/>
                 </svg>
               </span>
-              <input type="password" id="reg-pin-confirm-input" placeholder="••••" maxlength="4" />
+              <input type="password" id="reg-password-confirm-input" placeholder="Re-enter your password" />
+            </div>
+          </div>
+
+          <div class="field-group-exact" style="margin-bottom:1.5rem;">
+            <label class="field-label-exact" style="margin-bottom:0.5rem; display:block;">ACCOUNT TYPE</label>
+            <div class="account-type-fieldset">
+              <label class="account-type-option">
+                <input type="radio" name="reg-account-type" value="personal" checked />
+                <span>
+                  <strong>Personal</strong>
+                  <small>— I keep my own sales book.</small>
+                </span>
+              </label>
+              <label class="account-type-option">
+                <input type="radio" name="reg-account-type" value="organization" />
+                <span>
+                  <strong>Create an organization</strong>
+                  <small>— I become the admin of a shared ledger.</small>
+                </span>
+              </label>
             </div>
           </div>
 
@@ -440,9 +460,71 @@
             </div>
           </div>
 
+          <button type="button" id="btn-profile-org-action" class="btn-primary-green-exact" style="background:none; color:var(--ng-green-main); border:1.5px solid var(--ng-green-pill-border); margin-bottom:0.85rem;">
+            🏢 Create an organization
+          </button>
+
           <button type="button" id="btn-profile-logout" class="btn-primary-green-exact" style="background:#dc2626; color:#ffffff;">
             Lock / Sign Out
           </button>
+        </div>
+      </section>
+
+      <!-- =========================================================================
+           SCREEN 7: ORGANIZATION ADMIN (members + delete)
+           ========================================================================= -->
+      <section id="view-org-admin" class="app-view" aria-label="Organization Admin">
+        <div style="width:100%; max-width:700px; margin:0 auto;">
+          <header class="view-top-status-row" style="margin-bottom:1.5rem;">
+            <button type="button" id="btn-back-from-org-admin" class="nav-back-btn">←</button>
+            <h2 style="font-size:1.35rem; font-weight:800; color:var(--text-dark);" id="org-admin-title">Organization</h2>
+            <div style="width:44px;"></div>
+          </header>
+
+          <div class="breakdown-table-card" style="margin-bottom:1.75rem; padding:0; overflow:hidden;">
+            <table class="org-members-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th style="text-align:right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="org-members-table-body"></tbody>
+            </table>
+          </div>
+
+          <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-dark); margin-bottom:0.25rem;">Add member</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Create a member account for this organization.</p>
+
+          <div class="field-group-exact">
+            <label class="field-label-exact">USERNAME</label>
+            <div class="field-input-box-exact"><input type="text" id="new-member-username-input" placeholder="e.g. john_cashier" /></div>
+          </div>
+          <div class="field-group-exact">
+            <label class="field-label-exact">EMAIL (OPTIONAL)</label>
+            <div class="field-input-box-exact"><input type="email" id="new-member-email-input" placeholder="e.g. john@example.com" /></div>
+          </div>
+          <div class="field-group-exact">
+            <label class="field-label-exact">PASSWORD</label>
+            <div class="field-input-box-exact"><input type="password" id="new-member-password-input" placeholder="••••••••" /></div>
+          </div>
+          <div class="field-group-exact" style="margin-bottom:1.5rem;">
+            <label class="field-label-exact">CONFIRM PASSWORD</label>
+            <div class="field-input-box-exact"><input type="password" id="new-member-password-confirm-input" placeholder="••••••••" /></div>
+          </div>
+
+          <button type="button" id="btn-add-member" class="btn-primary-green-exact" style="margin-bottom:2rem;">
+            Add member
+          </button>
+
+          <div style="border-top:1.5px dashed #fecaca; padding-top:1.5rem; text-align:center; margin-bottom:2rem;">
+            <h3 style="font-size:1.05rem; font-weight:800; color:#dc2626; margin-bottom:0.5rem;">Delete organization</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">Members lose access immediately. Sales/expenses already recorded are kept, but stop being shared. This cannot be undone.</p>
+            <button type="button" id="btn-delete-org" class="btn-primary-green-exact" style="background:none; color:#dc2626; border:1.5px solid #fecaca;">
+              Delete organization
+            </button>
+          </div>
         </div>
       </section>
 
@@ -464,7 +546,7 @@
         <form id="form-record-sale" onsubmit="event.preventDefault();">
           <label class="field-label-exact" style="margin-bottom:0.35rem; display:block;">ITEMS SOLD</label>
           <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.65rem;">
-            Subtotal = Quantity × Price per unit. Selling one 50kg bag for a flat ₦58,000? Enter Quantity <strong>1</strong>, Unit <strong>bag</strong>, Price <strong>58,000</strong> — not Quantity 50.
+            Unit <strong>pcs</strong>: Quantity × Price = line total (price is per piece). Any other unit (kg, litre, carton...): Price is the flat total for that line — Quantity is just for your records. Your 50kg rice for ₦58,000 flat? Unit <strong>kg</strong>, Quantity <strong>50</strong>, Price <strong>58,000</strong>.
           </p>
           <div id="sale-items-list"><!-- item rows injected by app.js --></div>
 
@@ -478,7 +560,6 @@
             <option value="ml"></option>
             <option value="dozen"></option>
             <option value="pack"></option>
-            <option value="bag"></option>
             <option value="carton"></option>
             <option value="bunch"></option>
           </datalist>
@@ -592,7 +673,65 @@
     </div>
 
     <!-- =========================================================================
-         MODAL 3: ENTRY DETAIL (Sale / Expense — full breakdown + Print Receipt)
+         MODAL 3: CREATE ORGANIZATION
+         ========================================================================= -->
+    <div id="modal-create-org" class="modal-overlay" aria-hidden="true">
+      <div class="modal-box">
+        <div class="modal-header-row">
+          <h3 class="modal-title">🏢 Create an organization</h3>
+          <button class="modal-close-btn modal-backdrop-dismiss" aria-label="Close">✕</button>
+        </div>
+
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">
+          Turn your personal ledger into a shared team ledger. You join the new organization right away and can add members from the admin page.
+        </p>
+
+        <div class="field-group-exact">
+          <label class="field-label-exact">ORGANIZATION NAME</label>
+          <div class="field-input-box-exact">
+            <input type="text" id="org-name-input" placeholder="e.g. Ever Young Enterprises" />
+          </div>
+        </div>
+
+        <div class="field-group-exact">
+          <label class="field-label-exact" style="margin-bottom:0.5rem; display:block;">ORGANIZATION EMAIL</label>
+          <div class="account-type-fieldset">
+            <label class="account-type-option">
+              <input type="radio" name="org-email-choice" value="own" checked />
+              <span>
+                <strong>Use my email —</strong>
+                <small id="org-own-email-display">—</small>
+              </span>
+            </label>
+            <label class="account-type-option">
+              <input type="radio" name="org-email-choice" value="new" />
+              <span>
+                <strong>Use a new email</strong>
+                <small>— a verification code will be sent to it.</small>
+              </span>
+            </label>
+          </div>
+          <div class="field-input-box-exact" id="org-new-email-wrapper" style="display:none; margin-top:0.65rem;">
+            <input type="email" id="org-new-email-input" placeholder="e.g. team@yourbusiness.com" />
+          </div>
+        </div>
+
+        <label style="display:flex; align-items:flex-start; gap:0.6rem; margin:1rem 0 1.5rem; cursor:pointer;">
+          <input type="checkbox" id="org-migrate-checkbox" checked style="margin-top:3px;" />
+          <span style="font-size:0.85rem; color:var(--text-muted);">
+            <strong style="color:var(--text-dark);">Move my existing sales and expenses into the organization</strong><br/>
+            You join the organization right away and can switch views from the top bar.
+          </span>
+        </label>
+
+        <button type="button" id="btn-submit-create-org" class="btn-primary-green-exact">
+          Create organization
+        </button>
+      </div>
+    </div>
+
+    <!-- =========================================================================
+         MODAL 4: ENTRY DETAIL (Sale / Expense — full breakdown + Print Receipt)
          ========================================================================= -->
     <div id="modal-entry-detail" class="modal-overlay" aria-hidden="true">
       <div class="modal-box">

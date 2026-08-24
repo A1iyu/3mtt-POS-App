@@ -13,8 +13,11 @@ class POSApp {
   constructor() {
     this.isPinMasked = true;
 
-    // OTP state (verification itself happens server-side)
+    // OTP state (verification happens server-side) — used for either a
+    // personal registration in progress, or a new organization email
+    // waiting on its own OTP proof. Only one is ever active at a time.
     this._pendingRegData = null;
+    this._pendingOrgData = null;
     this._otpTimerInterval = null;
 
     // Real sales/expenses fetched from Supabase (via the backend)
@@ -27,6 +30,7 @@ class POSApp {
     this.renderProfileScreen();
     this.renderHistoryScreen('ALL');
     this.loadLedgerFromBackend();
+    this.checkAdminOrg();
   }
 
   // Fetch this agent's real sales and expenses from Supabase and normalize
@@ -34,10 +38,12 @@ class POSApp {
   async loadLedgerFromBackend() {
     if (!store.currentUserId) return; // not signed in to a real account yet
 
+    const orgParam = store.adminOrgId ? `&orgId=${store.adminOrgId}` : '';
+
     try {
       const [salesRes, expensesRes] = await Promise.all([
-        fetch(`${API_BASE}/api/sales?userId=${store.currentUserId}`),
-        fetch(`${API_BASE}/api/expenses?userId=${store.currentUserId}`)
+        fetch(`${API_BASE}/api/sales?userId=${store.currentUserId}${orgParam}`),
+        fetch(`${API_BASE}/api/expenses?userId=${store.currentUserId}${orgParam}`)
       ]);
       const salesData = await salesRes.json();
       const expensesData = await expensesRes.json();
@@ -149,7 +155,7 @@ class POSApp {
       const rows = (entry.items || []).map(it => `
         <div class="breakdown-row">
           <span>${it.name} <span style="color:var(--text-dim); font-weight:600;">(${it.quantity} ${it.unit})</span></span>
-          <span class="val">₦${(it.quantity * it.unitPrice).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+          <span class="val">₦${this.lineTotal(it.quantity, it.unitPrice, it.unit).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
         </div>
       `).join('');
 
@@ -206,7 +212,7 @@ class POSApp {
       ? (entry.items || []).map(it => `
           <div class="receipt-row">
             <span>${it.name} (${it.quantity} ${it.unit})</span>
-            <span>₦${(it.quantity * it.unitPrice).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+            <span>₦${this.lineTotal(it.quantity, it.unitPrice, it.unit).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
           </div>
         `).join('')
       : '';
@@ -336,6 +342,102 @@ class POSApp {
     if (nameElem) nameElem.textContent = store.agentName || store.agentBusiness;
     if (emailElem) emailElem.textContent = store.agentEmail || '';
     if (statusElem) statusElem.textContent = 'Active / Online';
+
+    const orgBtn = document.getElementById('btn-profile-org-action');
+    if (orgBtn) {
+      if (store.adminOrgId) {
+        orgBtn.textContent = `🏢 Manage ${store.adminOrgName || 'Organization'}`;
+        orgBtn.onclick = () => {
+          sound.playTap();
+          this.renderOrgAdminScreen();
+          this.showView('orgAdmin');
+        };
+      } else {
+        orgBtn.textContent = '🏢 Create an organization';
+        orgBtn.onclick = () => {
+          sound.playTap();
+          this.openCreateOrgModal();
+        };
+      }
+    }
+  }
+
+  // Checks whether the signed-in agent administers an organization, and
+  // caches the result so the rest of the app knows to record/read the
+  // shared org ledger instead of a personal one.
+  async checkAdminOrg() {
+    if (!store.currentUserId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/organizations?adminUserId=${store.currentUserId}`);
+      const data = await res.json();
+      if (res.ok && data.organizations && data.organizations.length > 0) {
+        store.adminOrgId = data.organizations[0].id;
+        store.adminOrgName = data.organizations[0].name;
+      } else {
+        store.adminOrgId = null;
+        store.adminOrgName = null;
+      }
+      store.persist();
+      this.renderProfileScreen();
+    } catch (err) {
+      console.error('checkAdminOrg error:', err);
+    }
+  }
+
+  openCreateOrgModal() {
+    const nameInput = document.getElementById('org-name-input');
+    const ownEmailRadio = document.querySelector('input[name="org-email-choice"][value="own"]');
+    const newEmailWrapper = document.getElementById('org-new-email-wrapper');
+    const newEmailInput = document.getElementById('org-new-email-input');
+    const ownEmailDisplay = document.getElementById('org-own-email-display');
+    const migrateCheckbox = document.getElementById('org-migrate-checkbox');
+
+    if (nameInput) nameInput.value = '';
+    if (ownEmailRadio) ownEmailRadio.checked = true;
+    if (newEmailWrapper) newEmailWrapper.style.display = 'none';
+    if (newEmailInput) newEmailInput.value = '';
+    if (ownEmailDisplay) ownEmailDisplay.textContent = store.agentEmail || '';
+    if (migrateCheckbox) migrateCheckbox.checked = true;
+
+    this.modals.createOrg?.classList.add('active');
+  }
+
+  async renderOrgAdminScreen() {
+    const titleElem = document.getElementById('org-admin-title');
+    if (titleElem) titleElem.textContent = store.adminOrgName || 'Organization';
+
+    const tbody = document.getElementById('org-members-table-body');
+    if (!tbody || !store.adminOrgId) return;
+
+    tbody.innerHTML = `<tr><td colspan="3" style="padding:1rem; text-align:center; color:var(--text-muted);">Loading...</td></tr>`;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/organizations/${store.adminOrgId}/members?adminUserId=${store.currentUserId}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load members');
+
+      const adminRow = `
+        <tr>
+          <td style="font-weight:700;">${store.agentName || store.agentBusiness} <span style="color:var(--text-dim); font-weight:500;">(you)</span></td>
+          <td>Admin</td>
+          <td style="text-align:right; color:var(--text-dim); font-size:0.8rem;">—</td>
+        </tr>
+      `;
+
+      const memberRows = (data.members || []).map(m => `
+        <tr>
+          <td style="font-weight:700;">${m.username}</td>
+          <td style="text-transform:capitalize;">${m.role}</td>
+          <td style="text-align:right;">
+            <button type="button" class="btn-remove-member" data-member-id="${m.id}">Remove</button>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.innerHTML = adminRow + (memberRows || `<tr><td colspan="3" style="padding:1rem; text-align:center; color:var(--text-muted);">No members yet</td></tr>`);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="3" style="padding:1rem; text-align:center; color:#dc2626;">Could not load members</td></tr>`;
+    }
   }
 
   // ---- Multi-item Record Sale modal helpers ----
@@ -347,7 +449,7 @@ class POSApp {
           <input type="text" class="sale-item-name" placeholder="Item name" list="sale-item-suggestions" autocomplete="off" />
           <input type="number" class="sale-item-qty" placeholder="Quantity" min="0.01" step="any" value="1" />
           <input type="text" class="sale-item-unit" placeholder="Unit (bag, kg, pcs)" list="sale-unit-suggestions" autocomplete="off" />
-          <input type="number" class="sale-item-price" placeholder="₦ Price per unit" min="0" step="0.01" />
+          <input type="number" class="sale-item-price" placeholder="₦ Price" min="0" step="0.01" />
         </div>
         <button type="button" class="btn-remove-item-row" aria-label="Remove item">✕</button>
       </div>
@@ -409,7 +511,7 @@ class POSApp {
     const datalist = document.getElementById('sale-unit-suggestions');
     if (!datalist) return;
 
-    const genericUnits = ['pcs', 'kg', 'g', 'litre', 'ml', 'dozen', 'pack', 'bag', 'carton', 'bunch'];
+    const genericUnits = ['pcs', 'kg', 'g', 'litre', 'ml', 'dozen', 'pack', 'carton', 'bunch'];
     const typed = name.trim().toLowerCase();
     const knownForItem = typed
       ? this.loadRecentSaleItems()
@@ -457,13 +559,21 @@ class POSApp {
     this.recalcSaleTotals();
   }
 
+  // Must match the same rule in server.js exactly, or the total shown here
+  // won't match what actually gets saved to the database.
+  lineTotal(qty, price, unit) {
+    const cleanUnit = (unit || 'pcs').trim().toLowerCase();
+    return cleanUnit === 'pcs' ? qty * price : price;
+  }
+
   recalcSaleTotals() {
     const rows = document.querySelectorAll('#sale-items-list .sale-item-row');
     let subtotal = 0;
     rows.forEach(row => {
       const qty = parseFloat(row.querySelector('.sale-item-qty')?.value) || 0;
       const price = parseFloat(row.querySelector('.sale-item-price')?.value) || 0;
-      subtotal += qty * price;
+      const unit = row.querySelector('.sale-item-unit')?.value || 'pcs';
+      subtotal += this.lineTotal(qty, price, unit);
     });
 
     const taxRatePercent = parseFloat(document.getElementById('sale-tax-rate-input')?.value) || 0;
@@ -502,13 +612,15 @@ class POSApp {
       otp: document.getElementById('view-otp'),
       menu: document.getElementById('view-menu'),
       history: document.getElementById('view-history'),
-      profile: document.getElementById('view-profile')
+      profile: document.getElementById('view-profile'),
+      orgAdmin: document.getElementById('view-org-admin')
     };
 
     this.modals = {
       recordSale: document.getElementById('modal-record-sale'),
       addExpense: document.getElementById('modal-add-expense'),
-      entryDetail: document.getElementById('modal-entry-detail')
+      entryDetail: document.getElementById('modal-entry-detail'),
+      createOrg: document.getElementById('modal-create-org')
     };
 
     this.toastElem = document.getElementById('pos-toast');
@@ -608,12 +720,12 @@ class POSApp {
   initEventListeners() {
     // 1. Login
     const performLogin = async () => {
-      const phoneInput = document.getElementById('login-phone-input')?.value.trim();
-      const pinInput = document.getElementById('login-pin-input')?.value.trim();
+      const identifierInput = document.getElementById('login-identifier-input')?.value.trim();
+      const passwordInput = document.getElementById('login-password-input')?.value;
 
-      if (!phoneInput || !pinInput) {
+      if (!identifierInput || !passwordInput) {
         sound.playError();
-        this.showToast('Enter your phone number and PIN');
+        this.showToast('Enter your email/phone and password');
         return;
       }
 
@@ -625,10 +737,10 @@ class POSApp {
         const res = await fetch(`${API_BASE}/api/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: phoneInput, pin: pinInput })
+          body: JSON.stringify({ identifier: identifierInput, password: passwordInput })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Incorrect phone or PIN');
+        if (!res.ok) throw new Error(data.error || 'Incorrect email/phone or password');
 
         store.setSignedInUser(data.user);
 
@@ -638,9 +750,10 @@ class POSApp {
         this.renderProfileScreen();
         this.showView('menu');
         this.loadLedgerFromBackend();
+        this.checkAdminOrg();
       } catch (err) {
         sound.playError();
-        this.showToast(err.message || 'Incorrect phone or PIN. Please try again.');
+        this.showToast(err.message || 'Incorrect email/phone or password. Please try again.');
       } finally {
         if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalLabel; }
       }
@@ -672,8 +785,8 @@ class POSApp {
       const biz = document.getElementById('reg-business-input')?.value.trim();
       const phone = document.getElementById('reg-phone-input')?.value.trim();
       const email = document.getElementById('reg-email-input')?.value.trim();
-      const pin = document.getElementById('reg-pin-input')?.value.trim();
-      const confirmPin = document.getElementById('reg-pin-confirm-input')?.value.trim();
+      const password = document.getElementById('reg-password-input')?.value;
+      const confirmPassword = document.getElementById('reg-password-confirm-input')?.value;
 
       if (!name || !biz || !phone || !email) {
         sound.playError();
@@ -687,19 +800,20 @@ class POSApp {
         return;
       }
 
-      if (!pin || pin.length < 4) {
+      if (!password || password.length < 6) {
         sound.playError();
-        this.showToast('PIN must be 4 digits!');
+        this.showToast('Password must be at least 6 characters!');
         return;
       }
 
-      if (pin !== confirmPin) {
+      if (password !== confirmPassword) {
         sound.playError();
-        this.showToast('PINs do not match! Please re-check');
+        this.showToast('Passwords do not match! Please re-check');
         return;
       }
 
-      this._pendingRegData = { name, biz, phone, email, pin };
+      const accountType = document.querySelector('input[name="reg-account-type"]:checked')?.value || 'personal';
+      this._pendingRegData = { name, biz, phone, email, password, accountType };
 
       const maskedEmail = email.replace(/(.{1}).+(@.+)/, '$1***$2');
       document.getElementById('otp-masked-email').textContent = maskedEmail;
@@ -741,10 +855,16 @@ class POSApp {
     document.getElementById('btn-back-from-otp')?.addEventListener('click', () => {
       sound.playTap();
       clearInterval(this._otpTimerInterval);
-      this.showView('register');
+      if (this._pendingOrgData) {
+        this._pendingOrgData = null;
+        this.showView('profile');
+      } else {
+        this.showView('register');
+      }
     });
 
-    // Verify OTP → finalize real account creation
+    // Verify OTP → either finalize a real account (personal registration)
+    // or finalize a new organization (org email verification)
     document.getElementById('btn-submit-otp')?.addEventListener('click', async () => {
       const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
         .map(id => document.getElementById(id)?.value || '')
@@ -756,10 +876,10 @@ class POSApp {
         return;
       }
 
-      if (!this._pendingRegData) {
+      if (!this._pendingRegData && !this._pendingOrgData) {
         sound.playError();
-        this.showToast('Session expired. Please register again.');
-        this.showView('register');
+        this.showToast('Session expired. Please try again.');
+        this.showView(this._pendingOrgData ? 'profile' : 'register');
         return;
       }
 
@@ -768,36 +888,7 @@ class POSApp {
       verifyBtn.disabled = true;
       verifyBtn.textContent = 'Verifying...';
 
-      try {
-        const res = await fetch(`${API_BASE}/api/verify-otp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: this._pendingRegData.email,
-            otp: entered,
-            name: this._pendingRegData.name,
-            businessName: this._pendingRegData.biz,
-            phone: this._pendingRegData.phone,
-            pin: this._pendingRegData.pin
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Incorrect OTP');
-
-        clearInterval(this._otpTimerInterval);
-        store.setSignedInUser(data.user);
-
-        const loginPhone = document.getElementById('login-phone-input');
-        if (loginPhone) loginPhone.value = data.user.phone;
-
-        sound.playSuccess();
-        this.showToast(`Account created! Welcome, ${data.user.business_name || data.user.name}`);
-        this.renderDashboard();
-        this.renderProfileScreen();
-        this.showView('menu');
-        this._pendingRegData = null;
-        this.loadLedgerFromBackend();
-      } catch (err) {
+      const showOtpError = (message) => {
         sound.playError();
         ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
           document.getElementById(id)?.classList.add('error');
@@ -809,7 +900,87 @@ class POSApp {
           });
           document.getElementById('otp-d1')?.focus();
         }, 600);
-        this.showToast(err.message || 'Incorrect OTP! Check the code sent to your email.');
+        this.showToast(message);
+      };
+
+      // ---- Path 1: verifying a NEW organization email ----
+      if (this._pendingOrgData) {
+        try {
+          const res = await fetch(`${API_BASE}/api/verify-org-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orgEmail: this._pendingOrgData.email,
+              otp: entered,
+              orgName: this._pendingOrgData.orgName,
+              adminUserId: this._pendingOrgData.adminUserId,
+              migrateExisting: this._pendingOrgData.migrateExisting
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Incorrect OTP');
+
+          clearInterval(this._otpTimerInterval);
+          store.adminOrgId = data.organization.id;
+          store.adminOrgName = data.organization.name;
+          store.persist();
+
+          sound.playSuccess();
+          this.showToast(`🏢 ${data.organization.name} created!`);
+          this._pendingOrgData = null;
+          this.renderProfileScreen();
+          this.loadLedgerFromBackend();
+          this.renderOrgAdminScreen();
+          this.showView('orgAdmin');
+        } catch (err) {
+          showOtpError(err.message || 'Incorrect OTP! Check the code sent to that email.');
+        } finally {
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = originalLabel;
+        }
+        return;
+      }
+
+      // ---- Path 2: verifying a personal registration ----
+      try {
+        const res = await fetch(`${API_BASE}/api/verify-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: this._pendingRegData.email,
+            otp: entered,
+            name: this._pendingRegData.name,
+            businessName: this._pendingRegData.biz,
+            phone: this._pendingRegData.phone,
+            password: this._pendingRegData.password
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Incorrect OTP');
+
+        clearInterval(this._otpTimerInterval);
+        store.setSignedInUser(data.user);
+
+        const loginIdentifier = document.getElementById('login-identifier-input');
+        if (loginIdentifier) loginIdentifier.value = data.user.phone;
+
+        const wantsOrg = this._pendingRegData.accountType === 'organization';
+        this._pendingRegData = null;
+        this.loadLedgerFromBackend();
+
+        sound.playSuccess();
+        this.renderDashboard();
+        this.renderProfileScreen();
+        this.showView('menu');
+
+        if (wantsOrg) {
+          this.showToast(`Account created! Let's set up your organization.`);
+          this.openCreateOrgModal();
+        } else {
+          this.showToast(`Account created! Welcome, ${data.user.business_name || data.user.name}`);
+        }
+      } catch (err) {
+        showOtpError(err.message || 'Incorrect OTP! Check the code sent to your email.');
       } finally {
         verifyBtn.disabled = false;
         verifyBtn.textContent = originalLabel;
@@ -817,7 +988,8 @@ class POSApp {
     });
 
     document.getElementById('btn-resend-otp')?.addEventListener('click', async () => {
-      if (!this._pendingRegData) return;
+      const pending = this._pendingOrgData || this._pendingRegData;
+      if (!pending) return;
       sound.playTap();
       const resendBtn = document.getElementById('btn-resend-otp');
       resendBtn.disabled = true;
@@ -826,7 +998,7 @@ class POSApp {
         const res = await fetch(`${API_BASE}/api/send-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this._pendingRegData.email, name: this._pendingRegData.name })
+          body: JSON.stringify({ email: pending.email, name: pending.name || pending.orgName })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to resend OTP');
@@ -851,19 +1023,19 @@ class POSApp {
       this.showView('profile');
     });
 
-    // PIN Peek Toggle (login form)
+    // Password Peek Toggle (login form)
     document.getElementById('btn-toggle-pin-peek')?.addEventListener('click', () => {
       sound.playTap();
-      const pinInput = document.getElementById('login-pin-input');
-      if (pinInput) {
+      const passwordInput = document.getElementById('login-password-input');
+      if (passwordInput) {
         this.isPinMasked = !this.isPinMasked;
-        pinInput.type = this.isPinMasked ? 'password' : 'text';
+        passwordInput.type = this.isPinMasked ? 'password' : 'text';
       }
     });
 
     document.getElementById('link-forgot-pin')?.addEventListener('click', () => {
       sound.playTap();
-      this.showToast('Enter your registered phone number and PIN to sign in.');
+      this.showToast('Enter your registered email/phone and password to sign in.');
     });
 
     // Bottom Navigation
@@ -981,6 +1153,7 @@ class POSApp {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: store.currentUserId,
+            orgId: store.adminOrgId || null,
             items,
             taxRate: taxRatePercent / 100,
             note
@@ -1032,6 +1205,7 @@ class POSApp {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: store.currentUserId,
+            orgId: store.adminOrgId || null,
             category: category || title,
             amount,
             note: title !== category ? `${title}${note ? ' — ' + note : ''}` : note
@@ -1088,6 +1262,218 @@ class POSApp {
     // Print Receipt button inside the entry detail modal
     document.getElementById('btn-print-entry-receipt')?.addEventListener('click', () => {
       this.printEntryReceipt(this._activeDetailEntry);
+    });
+
+    // Toggle the "use a new email" field on the Create Organization modal
+    document.getElementById('modal-create-org')?.addEventListener('change', (e) => {
+      if (e.target.name === 'org-email-choice') {
+        const wrapper = document.getElementById('org-new-email-wrapper');
+        if (wrapper) wrapper.style.display = e.target.value === 'new' ? 'block' : 'none';
+      }
+    });
+
+    // Create Organization submit — either instant (own already-verified
+    // email) or via a fresh OTP proof (a new email)
+    document.getElementById('btn-submit-create-org')?.addEventListener('click', async () => {
+      const orgName = document.getElementById('org-name-input')?.value.trim();
+      const useNewEmail = document.querySelector('input[name="org-email-choice"]:checked')?.value === 'new';
+      const newEmail = document.getElementById('org-new-email-input')?.value.trim();
+      const migrateExisting = document.getElementById('org-migrate-checkbox')?.checked;
+
+      if (!orgName) {
+        sound.playError();
+        this.showToast('Please enter an organization name');
+        return;
+      }
+      if (useNewEmail && (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail))) {
+        sound.playError();
+        this.showToast('Please enter a valid organization email');
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit-create-org');
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+
+      if (!useNewEmail) {
+        btn.textContent = 'Creating...';
+        try {
+          const res = await fetch(`${API_BASE}/api/organizations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orgName, adminUserId: store.currentUserId, migrateExisting })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to create organization');
+
+          store.adminOrgId = data.organization.id;
+          store.adminOrgName = data.organization.name;
+          store.persist();
+
+          sound.playSuccess();
+          this.showToast(`🏢 ${data.organization.name} created!`);
+          this.modals.createOrg.classList.remove('active');
+          this.renderProfileScreen();
+          this.loadLedgerFromBackend();
+          this.renderOrgAdminScreen();
+          this.showView('orgAdmin');
+        } catch (err) {
+          sound.playError();
+          this.showToast(err.message || 'Could not create organization.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }
+        return;
+      }
+
+      // New email path: send OTP, then reuse the existing OTP screen to verify it
+      btn.textContent = 'Sending code...';
+      try {
+        const res = await fetch(`${API_BASE}/api/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: newEmail, name: orgName })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
+
+        this._pendingOrgData = { orgName, email: newEmail, adminUserId: store.currentUserId, migrateExisting };
+        const maskedEmail = newEmail.replace(/(.{1}).+(@.+)/, '$1***$2');
+        document.getElementById('otp-masked-email').textContent = maskedEmail;
+        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.value = ''; el.classList.remove('filled','error'); }
+        });
+
+        this.modals.createOrg.classList.remove('active');
+        this.showToast(`OTP sent to ${maskedEmail}`);
+        this.startOtpTimer();
+        this.showView('otp');
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not send OTP.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    });
+
+    document.getElementById('btn-back-from-org-admin')?.addEventListener('click', () => {
+      sound.playTap();
+      this.showView('profile');
+    });
+
+    // Add a member — admin only, sets username/password directly
+    document.getElementById('btn-add-member')?.addEventListener('click', async () => {
+      const username = document.getElementById('new-member-username-input')?.value.trim();
+      const email = document.getElementById('new-member-email-input')?.value.trim();
+      const password = document.getElementById('new-member-password-input')?.value;
+      const confirmPassword = document.getElementById('new-member-password-confirm-input')?.value;
+
+      if (!username || !password) {
+        sound.playError();
+        this.showToast('Username and password are required');
+        return;
+      }
+      if (password.length < 4) {
+        sound.playError();
+        this.showToast('Password should be at least 4 characters');
+        return;
+      }
+      if (password !== confirmPassword) {
+        sound.playError();
+        this.showToast('Passwords do not match');
+        return;
+      }
+      if (!store.adminOrgId) return;
+
+      const btn = document.getElementById('btn-add-member');
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/organizations/${store.adminOrgId}/members`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminUserId: store.currentUserId, username, email: email || null, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to add member');
+
+        sound.playSuccess();
+        this.showToast(`Member "${username}" added!`);
+        document.getElementById('new-member-username-input').value = '';
+        document.getElementById('new-member-email-input').value = '';
+        document.getElementById('new-member-password-input').value = '';
+        document.getElementById('new-member-password-confirm-input').value = '';
+        this.renderOrgAdminScreen();
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not add member.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    });
+
+    // Remove a member (event delegation on the table body)
+    document.getElementById('org-members-table-body')?.addEventListener('click', async (e) => {
+      const removeBtn = e.target.closest('.btn-remove-member');
+      if (!removeBtn || !store.adminOrgId) return;
+      const memberId = removeBtn.getAttribute('data-member-id');
+      if (!window.confirm('Remove this member? They will no longer be able to sign in.')) return;
+
+      sound.playTap();
+      try {
+        const res = await fetch(`${API_BASE}/api/organizations/${store.adminOrgId}/members/${memberId}?adminUserId=${store.currentUserId}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to remove member');
+        this.showToast('Member removed');
+        this.renderOrgAdminScreen();
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not remove member.');
+      }
+    });
+
+    // Delete organization — admin only, irreversible
+    document.getElementById('btn-delete-org')?.addEventListener('click', async () => {
+      if (!store.adminOrgId) return;
+      if (!window.confirm('This will permanently delete the organization and remove all members. Sales/expenses already recorded are kept but stop being shared. Continue?')) return;
+
+      sound.playTap();
+      const btn = document.getElementById('btn-delete-org');
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+
+      try {
+        const res = await fetch(`${API_BASE}/api/organizations/${store.adminOrgId}?adminUserId=${store.currentUserId}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to delete organization');
+
+        store.adminOrgId = null;
+        store.adminOrgName = null;
+        store.persist();
+
+        sound.playSuccess();
+        this.showToast('Organization deleted');
+        this.renderProfileScreen();
+        this.loadLedgerFromBackend();
+        this.showView('profile');
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Could not delete organization.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
     });
 
     // Modal Close

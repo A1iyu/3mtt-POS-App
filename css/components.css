@@ -982,3 +982,87 @@
 .otp-resend-btn:not(:disabled):hover {
   background-color: var(--ng-green-pill-bg);
 }
+
+/* ---- Account Type selector (registration + org email choice) ---- */
+.account-type-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  background: var(--surface-white);
+}
+
+.account-type-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  cursor: pointer;
+  padding: 0.6rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background var(--ease-fast);
+}
+
+.account-type-option:hover {
+  background: var(--ng-green-pill-bg);
+}
+
+.account-type-option input[type="radio"] {
+  margin-top: 3px;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--ng-green-main);
+  flex-shrink: 0;
+}
+
+.account-type-option strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text-dark);
+}
+
+.account-type-option small {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ---- Organization admin: members table ---- */
+.org-members-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.org-members-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--ng-green-pill-bg);
+}
+
+.org-members-table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  border-top: 1px solid var(--input-border);
+}
+
+.btn-remove-member {
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-remove-member:hover {
+  background: #fecaca;
+}
