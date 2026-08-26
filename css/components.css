@@ -1066,3 +1066,132 @@
 .btn-remove-member:hover {
   background: #fecaca;
 }
+
+/* ---- Auth screens: dark neon bar-chart background (guaranteed full-bleed
+   via a plain CSS gradient, not dependent on SVG scaling) ---- */
+.auth-bg-decor {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(160deg, #04351f 0%, #0a5c34 55%, #04351f 100%);
+  display: none;
+}
+
+.auth-bg-decor.visible {
+  display: block;
+}
+
+.auth-bg-chart-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.auth-bg-chart-svg .glow-bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation-name: barGrowSweep;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  filter: drop-shadow(0 0 5px rgba(0, 208, 108, 0.85));
+}
+
+@keyframes barGrowSweep {
+  0%   { transform: scaleY(0); }
+  40%  { transform: scaleY(1); }
+  65%  { transform: scaleY(1); }
+  100% { transform: scaleY(0); }
+}
+
+.auth-bg-chart-svg .trend-line {
+  animation: trendLineDraw 6s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(124, 255, 178, 0.9));
+}
+
+@keyframes trendLineDraw {
+  0%   { stroke-dashoffset: 1; opacity: 0; }
+  8%   { opacity: 1; }
+  70%  { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
+.auth-bg-symbol {
+  position: absolute;
+  font-weight: 800;
+  font-family: var(--font-main);
+  color: var(--ng-green-glow);
+  text-shadow: 0 0 10px rgba(0, 208, 108, 0.6);
+  opacity: 0;
+  animation-name: authSymbolFloat;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes authSymbolFloat {
+  0%   { opacity: 0;    transform: translateY(24px) scale(0.85); }
+  15%  { opacity: 0.65; }
+  50%  { opacity: 0.85; transform: translateY(-14px) scale(1); }
+  85%  { opacity: 0.35; }
+  100% { opacity: 0;    transform: translateY(-46px) scale(0.9); }
+}
+
+/* Auth form content must sit above the fixed background layer */
+.auth-centered-card {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Login/Register text visibility against the dark animated background.
+   Scoped to these two screens only — Verify/OTP still sits on the normal
+   light page background and needs its original dark text unchanged. ---- */
+#view-login .auth-title-exact,
+#view-register .auth-title-exact {
+  color: #ffffff;
+}
+
+#view-login .auth-subtitle-exact,
+#view-register .auth-subtitle-exact {
+  color: #d7f5e6;
+}
+
+#view-login .field-label-exact,
+#view-register .field-label-exact {
+  color: #b9ecd2;
+  font-weight: 800;
+}
+
+#view-login .auth-footer-exact,
+#view-register .auth-footer-exact {
+  color: #d7f5e6;
+}
+
+#view-login .auth-footer-exact a,
+#view-register .auth-footer-exact a {
+  color: var(--ng-green-glow);
+}
+
+#view-login .forgot-pin-link-exact,
+#view-register .forgot-pin-link-exact {
+  color: var(--ng-green-glow);
+  font-weight: 800;
+}
+
+#view-register .account-type-fieldset {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+#view-register .account-type-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#view-register .account-type-option strong {
+  color: #ffffff;
+}
+
+#view-register .account-type-option small {
+  color: #cdeee0;
+}
