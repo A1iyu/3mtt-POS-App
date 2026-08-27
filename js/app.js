@@ -31,19 +31,53 @@ class POSApp {
     this.renderHistoryScreen('ALL');
     this.loadLedgerFromBackend();
     this.checkAdminOrg();
+    this.checkForInviteLink();
+  }
+
+  // If this page was opened via an invite email link (?invite=TOKEN),
+  // validate it and show the "join organization" screen instead of login.
+  async checkForInviteLink() {
+    const token = new URLSearchParams(window.location.search).get('invite');
+    if (!token) return;
+
+    this._inviteToken = token;
+    this.showView('acceptInvite');
+
+    const nameElem = document.getElementById('invite-org-name');
+    const subtitleElem = document.getElementById('invite-subtitle');
+    const statusBox = document.getElementById('invite-status-box');
+    const formFields = document.getElementById('invite-form-fields');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/invites/${token}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'This invite link is invalid.');
+
+      if (nameElem) nameElem.textContent = data.orgName;
+      if (subtitleElem) subtitleElem.textContent = `You're invited as ${data.email}. Create your username and password to get started.`;
+    } catch (err) {
+      if (statusBox) {
+        statusBox.style.display = 'block';
+        statusBox.textContent = err.message || 'This invite link is invalid.';
+      }
+      if (formFields) formFields.style.display = 'none';
+      this._inviteToken = null;
+    }
   }
 
   // Fetch this agent's real sales and expenses from Supabase and normalize
   // them into one list every ledger view (Home preview, Business, History) shares.
   async loadLedgerFromBackend() {
-    if (!store.currentUserId) return; // not signed in to a real account yet
+    if (!store.currentUserId && !store.memberId) return; // not signed in to any real account yet
 
-    const orgParam = store.adminOrgId ? `&orgId=${store.adminOrgId}` : '';
+    const params = store.memberId
+      ? `orgMemberId=${store.memberId}`
+      : `userId=${store.currentUserId}${store.adminOrgId ? `&orgId=${store.adminOrgId}` : ''}`;
 
     try {
       const [salesRes, expensesRes] = await Promise.all([
-        fetch(`${API_BASE}/api/sales?userId=${store.currentUserId}${orgParam}`),
-        fetch(`${API_BASE}/api/expenses?userId=${store.currentUserId}${orgParam}`)
+        fetch(`${API_BASE}/api/sales?${params}`),
+        fetch(`${API_BASE}/api/expenses?${params}`)
       ]);
       const salesData = await salesRes.json();
       const expensesData = await expensesRes.json();
@@ -287,12 +321,17 @@ class POSApp {
 
   // ---- Home dashboard ----
   renderDashboard() {
+    const displayName = store.memberId
+      ? `${store.memberOrgName || 'Organization'} (${store.memberUsername})`
+      : (store.agentBusiness || 'My Business');
+
     const titleElem = document.getElementById('dash-business-title');
-    if (titleElem) titleElem.textContent = store.agentBusiness || 'My Business';
+    if (titleElem) titleElem.textContent = displayName;
 
     const avatarElem = document.getElementById('dash-avatar-circle');
     if (avatarElem) {
-      const initials = (store.agentBusiness || store.agentName || 'AG')
+      const initialsSource = store.memberId ? (store.memberOrgName || store.memberUsername || 'M') : (store.agentBusiness || store.agentName || 'AG');
+      const initials = initialsSource
         .split(' ')
         .filter(Boolean)
         .map(w => w[0])
@@ -327,6 +366,25 @@ class POSApp {
     const nameElem = document.getElementById('profile-agent-name');
     const emailElem = document.getElementById('profile-agent-email');
     const statusElem = document.getElementById('profile-agent-status');
+    const orgBtn = document.getElementById('btn-profile-org-action');
+    const orgBtnLabel = document.getElementById('btn-profile-org-action-label');
+
+    if (store.memberId) {
+      const initials = (store.memberOrgName || store.memberUsername || 'M')
+        .split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
+      if (avatarElem) avatarElem.textContent = initials || 'M';
+      if (bizElem) bizElem.textContent = store.memberOrgName || 'Organization';
+      if (phoneElem) phoneElem.textContent = '—';
+      if (nameElem) nameElem.textContent = store.memberUsername || '';
+      if (emailElem) emailElem.textContent = 'Team member';
+      if (statusElem) statusElem.textContent = 'Active / Online';
+      // Members don't administer organizations — this button is admin-only
+      if (orgBtn) orgBtn.style.display = 'none';
+      return;
+    }
+
+    if (orgBtn) orgBtn.style.display = '';
 
     const initials = (store.agentBusiness || store.agentName || 'AG')
       .split(' ')
@@ -343,8 +401,6 @@ class POSApp {
     if (emailElem) emailElem.textContent = store.agentEmail || '';
     if (statusElem) statusElem.textContent = 'Active / Online';
 
-    const orgBtn = document.getElementById('btn-profile-org-action');
-    const orgBtnLabel = document.getElementById('btn-profile-org-action-label');
     if (orgBtn && orgBtnLabel) {
       if (store.adminOrgId) {
         orgBtnLabel.textContent = `Manage ${store.adminOrgName || 'Organization'}`;
@@ -439,6 +495,18 @@ class POSApp {
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="3" style="padding:1rem; text-align:center; color:#dc2626;">Could not load members</td></tr>`;
     }
+  }
+
+  // Every sales/expenses request needs to say WHO is acting — either a
+  // personal/admin user (optionally with an org), or an org member. Centralizing
+  // this avoids the two submit handlers (and any future ones) drifting apart.
+  getActorPayload() {
+    if (store.memberId) return { orgMemberId: store.memberId };
+    return { userId: store.currentUserId, orgId: store.adminOrgId || null };
+  }
+
+  isSignedIn() {
+    return !!(store.currentUserId || store.memberId);
   }
 
   // ---- Multi-item Record Sale modal helpers ----
@@ -611,6 +679,7 @@ class POSApp {
       login: document.getElementById('view-login'),
       register: document.getElementById('view-register'),
       otp: document.getElementById('view-otp'),
+      acceptInvite: document.getElementById('view-accept-invite'),
       menu: document.getElementById('view-menu'),
       history: document.getElementById('view-history'),
       profile: document.getElementById('view-profile'),
@@ -727,14 +796,16 @@ class POSApp {
   }
 
   initEventListeners() {
-    // 1. Login
+    // 1. Login (personal/admin OR org member — toggled via link-toggle-member-login)
+    this._loginMode = 'personal';
+
     const performLogin = async () => {
       const identifierInput = document.getElementById('login-identifier-input')?.value.trim();
       const passwordInput = document.getElementById('login-password-input')?.value;
 
       if (!identifierInput || !passwordInput) {
         sound.playError();
-        this.showToast('Enter your email/phone and password');
+        this.showToast(this._loginMode === 'member' ? 'Enter your username and password' : 'Enter your email/phone and password');
         return;
       }
 
@@ -743,18 +814,32 @@ class POSApp {
       if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Signing in...'; }
 
       try {
-        const res = await fetch(`${API_BASE}/api/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: identifierInput, password: passwordInput })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Incorrect email/phone or password');
+        if (this._loginMode === 'member') {
+          const res = await fetch(`${API_BASE}/api/member-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: identifierInput, password: passwordInput })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Incorrect username or password');
 
-        store.setSignedInUser(data.user);
+          store.setSignedInMember(data.member);
+          sound.playSuccess();
+          this.showToast(`Welcome, ${data.member.username}!`);
+        } else {
+          const res = await fetch(`${API_BASE}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: identifierInput, password: passwordInput })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Incorrect email/phone or password');
 
-        sound.playSuccess();
-        this.showToast('Welcome back, ' + (store.agentBusiness || store.agentName || 'Agent'));
+          store.setSignedInUser(data.user);
+          sound.playSuccess();
+          this.showToast('Welcome back, ' + (store.agentBusiness || store.agentName || 'Agent'));
+        }
+
         this.renderDashboard();
         this.renderProfileScreen();
         this.showView('menu');
@@ -762,13 +847,38 @@ class POSApp {
         this.checkAdminOrg();
       } catch (err) {
         sound.playError();
-        this.showToast(err.message || 'Incorrect email/phone or password. Please try again.');
+        this.showToast(err.message || 'Incorrect credentials. Please try again.');
       } finally {
         if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalLabel; }
       }
     };
 
     document.getElementById('btn-submit-login')?.addEventListener('click', performLogin);
+
+    document.getElementById('link-toggle-member-login')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      sound.playTap();
+
+      const label = document.getElementById('login-identifier-label');
+      const identifierInput = document.getElementById('login-identifier-input');
+      const toggleLink = document.getElementById('link-toggle-member-login');
+
+      this._loginMode = this._loginMode === 'member' ? 'personal' : 'member';
+
+      if (this._loginMode === 'member') {
+        if (label) label.textContent = 'USERNAME';
+        if (identifierInput) identifierInput.placeholder = 'e.g. john_cashier';
+        if (toggleLink) toggleLink.textContent = 'Not a team member? Sign in with email/phone instead';
+      } else {
+        if (label) label.textContent = 'EMAIL OR PHONE NUMBER';
+        if (identifierInput) identifierInput.placeholder = 'agent@example.com or 0801 234 5678';
+        if (toggleLink) toggleLink.textContent = 'Sign in with your username';
+      }
+
+      if (identifierInput) identifierInput.value = '';
+      const passwordInput = document.getElementById('login-password-input');
+      if (passwordInput) passwordInput.value = '';
+    });
 
     // 2. Navigation to "Create an Account" & Back
     document.getElementById('link-go-to-register')?.addEventListener('click', (e) => {
@@ -1146,7 +1256,7 @@ class POSApp {
         return;
       }
 
-      if (!store.currentUserId) {
+      if (!this.isSignedIn()) {
         sound.playError();
         this.showToast('Please sign in again to record a sale.');
         return;
@@ -1161,8 +1271,7 @@ class POSApp {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: store.currentUserId,
-            orgId: store.adminOrgId || null,
+            ...this.getActorPayload(),
             items,
             taxRate: taxRatePercent / 100,
             note
@@ -1198,7 +1307,7 @@ class POSApp {
         return;
       }
 
-      if (!store.currentUserId) {
+      if (!this.isSignedIn()) {
         sound.playError();
         this.showToast('Please sign in again to record an expense.');
         return;
@@ -1213,8 +1322,7 @@ class POSApp {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: store.currentUserId,
-            orgId: store.adminOrgId || null,
+            ...this.getActorPayload(),
             category: category || title,
             amount,
             note: title !== category ? `${title}${note ? ' — ' + note : ''}` : note
@@ -1375,24 +1483,11 @@ class POSApp {
 
     // Add a member — admin only, sets username/password directly
     document.getElementById('btn-add-member')?.addEventListener('click', async () => {
-      const username = document.getElementById('new-member-username-input')?.value.trim();
       const email = document.getElementById('new-member-email-input')?.value.trim();
-      const password = document.getElementById('new-member-password-input')?.value;
-      const confirmPassword = document.getElementById('new-member-password-confirm-input')?.value;
 
-      if (!username || !password) {
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         sound.playError();
-        this.showToast('Username and password are required');
-        return;
-      }
-      if (password.length < 4) {
-        sound.playError();
-        this.showToast('Password should be at least 4 characters');
-        return;
-      }
-      if (password !== confirmPassword) {
-        sound.playError();
-        this.showToast('Passwords do not match');
+        this.showToast('Please enter a valid email address');
         return;
       }
       if (!store.adminOrgId) return;
@@ -1400,27 +1495,23 @@ class POSApp {
       const btn = document.getElementById('btn-add-member');
       const originalLabel = btn.textContent;
       btn.disabled = true;
-      btn.textContent = 'Adding...';
+      btn.textContent = 'Sending invite...';
 
       try {
         const res = await fetch(`${API_BASE}/api/organizations/${store.adminOrgId}/members`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminUserId: store.currentUserId, username, email: email || null, password })
+          body: JSON.stringify({ adminUserId: store.currentUserId, email })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to add member');
+        if (!res.ok) throw new Error(data.error || 'Failed to send invite');
 
         sound.playSuccess();
-        this.showToast(`Member "${username}" added!`);
-        document.getElementById('new-member-username-input').value = '';
+        this.showToast(`Invite sent to ${email}!`);
         document.getElementById('new-member-email-input').value = '';
-        document.getElementById('new-member-password-input').value = '';
-        document.getElementById('new-member-password-confirm-input').value = '';
-        this.renderOrgAdminScreen();
       } catch (err) {
         sound.playError();
-        this.showToast(err.message || 'Could not add member.');
+        this.showToast(err.message || 'Could not send invite.');
       } finally {
         btn.disabled = false;
         btn.textContent = originalLabel;

@@ -1,9 +1,10 @@
 /* ==========================================================================
    3MTT POS APP - LOCAL SESSION STORE
-   Remembers which real (Supabase-backed) agent is currently signed in on
-   this device, and whether they administer an organization. All actual
-   sales/expense data lives in Supabase — this file only caches identity so
-   the UI has something to render immediately.
+   Remembers which real (Supabase-backed) identity is currently signed in on
+   this device — either a personal/admin `users` account, OR an org member
+   account (a separate, username+password system). All actual sales/expense
+   data lives in Supabase — this file only caches identity so the UI has
+   something to render immediately.
    ========================================================================== */
 
 const STORAGE_KEYS = {
@@ -13,7 +14,11 @@ const STORAGE_KEYS = {
   AGENT_PHONE: '3mtt_pos_agent_phone_v4',
   CURRENT_USER_ID: '3mtt_pos_current_user_id_v4',
   ADMIN_ORG_ID: '3mtt_pos_admin_org_id_v1',
-  ADMIN_ORG_NAME: '3mtt_pos_admin_org_name_v1'
+  ADMIN_ORG_NAME: '3mtt_pos_admin_org_name_v1',
+  MEMBER_ID: '3mtt_pos_member_id_v1',
+  MEMBER_USERNAME: '3mtt_pos_member_username_v1',
+  MEMBER_ORG_ID: '3mtt_pos_member_org_id_v1',
+  MEMBER_ORG_NAME: '3mtt_pos_member_org_name_v1'
 };
 
 export class SessionStore {
@@ -28,6 +33,14 @@ export class SessionStore {
     // from the org's shared ledger instead of a personal one.
     this.adminOrgId = this.load(STORAGE_KEYS.ADMIN_ORG_ID, null);
     this.adminOrgName = this.load(STORAGE_KEYS.ADMIN_ORG_NAME, null);
+
+    // Org MEMBER session — a completely separate identity from the above.
+    // Only one of (currentUserId) or (memberId) is ever meaningfully "active"
+    // at a time; app.js decides which based on which is set.
+    this.memberId = this.load(STORAGE_KEYS.MEMBER_ID, null);
+    this.memberUsername = this.load(STORAGE_KEYS.MEMBER_USERNAME, null);
+    this.memberOrgId = this.load(STORAGE_KEYS.MEMBER_ORG_ID, null);
+    this.memberOrgName = this.load(STORAGE_KEYS.MEMBER_ORG_NAME, null);
   }
 
   load(key, fallback) {
@@ -52,10 +65,21 @@ export class SessionStore {
     this.agentEmail = user.email || '';
     this.agentPhone = user.phone || '';
     this.currentUserId = user.id;
+    this.clearMemberSession();
     this.persist();
   }
 
-  signOut() {
+  // Called right after a member login or invite-acceptance succeeds.
+  setSignedInMember(member) {
+    this.memberId = member.id;
+    this.memberUsername = member.username;
+    this.memberOrgId = member.org_id;
+    this.memberOrgName = member.orgName || 'Organization';
+    this.clearPersonalSession();
+    this.persist();
+  }
+
+  clearPersonalSession() {
     this.agentBusiness = '';
     this.agentName = '';
     this.agentEmail = '';
@@ -63,6 +87,18 @@ export class SessionStore {
     this.currentUserId = null;
     this.adminOrgId = null;
     this.adminOrgName = null;
+  }
+
+  clearMemberSession() {
+    this.memberId = null;
+    this.memberUsername = null;
+    this.memberOrgId = null;
+    this.memberOrgName = null;
+  }
+
+  signOut() {
+    this.clearPersonalSession();
+    this.clearMemberSession();
     this.persist();
   }
 
@@ -74,6 +110,10 @@ export class SessionStore {
     this.save(STORAGE_KEYS.CURRENT_USER_ID, this.currentUserId);
     this.save(STORAGE_KEYS.ADMIN_ORG_ID, this.adminOrgId);
     this.save(STORAGE_KEYS.ADMIN_ORG_NAME, this.adminOrgName);
+    this.save(STORAGE_KEYS.MEMBER_ID, this.memberId);
+    this.save(STORAGE_KEYS.MEMBER_USERNAME, this.memberUsername);
+    this.save(STORAGE_KEYS.MEMBER_ORG_ID, this.memberOrgId);
+    this.save(STORAGE_KEYS.MEMBER_ORG_NAME, this.memberOrgName);
   }
 }
 

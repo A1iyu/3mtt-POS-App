@@ -8,6 +8,7 @@
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
 const app = express();
@@ -23,6 +24,10 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Resend's shared sandbox sender — works with no domain setup.
 // Once you verify your own domain on Resend, switch this to e.g. otp@yourdomain.com
 const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+// Where your front-end is actually hosted — used to build clickable invite
+// links. Defaults to local dev; set this in Render once the front-end has a
+// real public URL.
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5500';
 
 // In-memory OTP store: email (lowercased) -> { otp, expiresAt }
 // Used for both personal account emails and organization emails —
@@ -34,28 +39,29 @@ function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-async function sendOtpEmail(email, name, otp) {
+// Generic sender — every transactional email (OTP, invites, admin
+// notifications) goes through this one function.
+async function sendEmail(to, subject, html) {
   const resendRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${RESEND_API_KEY}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to: email,
-      subject: 'Your 3MTT POS verification code',
-      html: `
-        <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
-          <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
-          <p style="color:#1f3a2c;">Hi ${name || 'there'}, your verification code is:</p>
-          <p style="font-size:34px;font-weight:800;letter-spacing:8px;color:#0f2419;margin:16px 0;">${otp}</p>
-          <p style="color:#52796f;font-size:13px;">This code expires in 5 minutes. If you didn't request this, you can safely ignore this email.</p>
-        </div>
-      `
-    })
+    body: JSON.stringify({ from: FROM_EMAIL, to, subject, html })
   });
   return resendRes.ok;
+}
+
+async function sendOtpEmail(email, name, otp) {
+  return sendEmail(email, 'Your 3MTT POS verification code', `
+    <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
+      <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+      <p style="color:#1f3a2c;">Hi ${name || 'there'}, your verification code is:</p>
+      <p style="font-size:34px;font-weight:800;letter-spacing:8px;color:#0f2419;margin:16px 0;">${otp}</p>
+      <p style="color:#52796f;font-size:13px;">This code expires in 5 minutes. If you didn't request this, you can safely ignore this email.</p>
+    </div>
+  `);
 }
 
 app.post('/api/send-otp', async (req, res) => {
@@ -259,41 +265,136 @@ app.get('/api/organizations', async (req, res) => {
   res.json({ organizations: data });
 });
 
-// Add a member — admin-only. The admin sets the member's username/password
-// directly; this is a separate login system from the OTP-verified users table.
+// Invite a member — admin-only. This sends an email link; the invitee sets
+// their OWN username and password when they accept it (no admin-set
+// passwords, and no plaintext password ever passing through this endpoint).
 app.post('/api/organizations/:orgId/members', async (req, res) => {
   const { orgId } = req.params;
-  const { adminUserId, username, email, password } = req.body || {};
+  const { adminUserId, email } = req.body || {};
 
-  if (!adminUserId || !username || !password) {
-    return res.status(400).json({ error: 'adminUserId, username and password are required' });
+  if (!adminUserId || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'adminUserId and a valid email are required' });
+  }
+  if (!RESEND_API_KEY) {
+    return res.status(500).json({ error: 'Email service is not configured on the server' });
+  }
+
+  const { data: org, error: orgErr } = await supabase
+    .from('organizations').select('id, name, admin_user_id').eq('id', orgId).maybeSingle();
+  if (orgErr || !org) return res.status(404).json({ error: 'Organization not found' });
+  if (org.admin_user_id !== adminUserId) {
+    return res.status(403).json({ error: "Only this organization's admin can invite members" });
+  }
+
+  const inviteToken = crypto.randomBytes(24).toString('hex');
+
+  const { data: invite, error: inviteErr } = await supabase
+    .from('org_invites')
+    .insert({ org_id: orgId, email, token: inviteToken })
+    .select('id, token')
+    .single();
+
+  if (inviteErr) {
+    console.error('create invite error:', inviteErr);
+    return res.status(500).json({ error: 'Failed to create invite' });
+  }
+
+  const inviteLink = `${FRONTEND_URL}/?invite=${invite.token}`;
+
+  const ok = await sendEmail(email, `You're invited to join ${org.name} on 3MTT POS`, `
+    <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
+      <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+      <p style="color:#1f3a2c;">You've been invited to join <strong>${org.name}</strong> as a team member.</p>
+      <p style="color:#1f3a2c;">Click below to create your own username and password:</p>
+      <p style="margin:20px 0;"><a href="${inviteLink}" style="background:#008751;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Join ${org.name}</a></p>
+      <p style="color:#52796f;font-size:13px;">This invite link expires in 7 days. If you weren't expecting this, you can safely ignore this email.</p>
+    </div>
+  `);
+
+  if (!ok) {
+    return res.status(502).json({ error: 'Invite created, but the email failed to send' });
+  }
+
+  res.json({ success: true, invited: email });
+});
+
+// Check an invite token before showing the accept-invite form (org name,
+// whether it's still valid).
+app.get('/api/invites/:token', async (req, res) => {
+  const { token } = req.params;
+
+  const { data: invite, error } = await supabase
+    .from('org_invites')
+    .select('id, email, used, expires_at, organizations(name)')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (error || !invite) return res.status(404).json({ error: 'This invite link is invalid.' });
+  if (invite.used) return res.status(410).json({ error: 'This invite has already been used.' });
+  if (new Date(invite.expires_at) < new Date()) {
+    return res.status(410).json({ error: 'This invite has expired. Ask the admin to send a new one.' });
+  }
+
+  res.json({ valid: true, email: invite.email, orgName: invite.organizations?.name || 'Organization' });
+});
+
+// Accept an invite — the invitee sets their own username/password here,
+// creating their real org_members account. Also notifies the org admin.
+app.post('/api/invites/:token/accept', async (req, res) => {
+  const { token } = req.params;
+  const { username, password } = req.body || {};
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
-  const { data: org, error: orgErr } = await supabase
-    .from('organizations').select('id, admin_user_id').eq('id', orgId).maybeSingle();
-  if (orgErr || !org) return res.status(404).json({ error: 'Organization not found' });
-  if (org.admin_user_id !== adminUserId) {
-    return res.status(403).json({ error: "Only this organization's admin can add members" });
+  const { data: invite, error: inviteErr } = await supabase
+    .from('org_invites')
+    .select('id, org_id, email, used, expires_at, organizations(name, admin_user_id)')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (inviteErr || !invite) return res.status(404).json({ error: 'This invite link is invalid.' });
+  if (invite.used) return res.status(410).json({ error: 'This invite has already been used.' });
+  if (new Date(invite.expires_at) < new Date()) {
+    return res.status(410).json({ error: 'This invite has expired. Ask the admin to send a new one.' });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
 
   const { data: member, error: memberErr } = await supabase
     .from('org_members')
-    .insert({ org_id: orgId, username, email: email || null, password_hash: passwordHash, role: 'member' })
+    .insert({ org_id: invite.org_id, username, email: invite.email, password_hash: passwordHash, role: 'member' })
     .select('id, org_id, username, email, role, created_at')
     .single();
 
   if (memberErr) {
     if (memberErr.code === '23505') return res.status(409).json({ error: 'That username is already taken' });
-    console.error('add member error:', memberErr);
-    return res.status(500).json({ error: 'Failed to add member' });
+    console.error('accept invite error:', memberErr);
+    return res.status(500).json({ error: 'Failed to create your account' });
   }
 
-  res.json({ success: true, member });
+  await supabase.from('org_invites').update({ used: true }).eq('id', invite.id);
+
+  const orgName = invite.organizations?.name || 'Organization';
+  const adminUserId = invite.organizations?.admin_user_id;
+
+  if (adminUserId && RESEND_API_KEY) {
+    const { data: adminUser } = await supabase.from('users').select('email').eq('id', adminUserId).maybeSingle();
+    if (adminUser?.email) {
+      sendEmail(adminUser.email, `${username} joined ${orgName}`, `
+        <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
+          <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+          <p style="color:#1f3a2c;"><strong>${username}</strong> (${invite.email}) just accepted your invite and joined <strong>${orgName}</strong>.</p>
+        </div>
+      `).catch(err => console.error('admin notify email error:', err));
+    }
+  }
+
+  res.json({ success: true, member: { ...member, orgName } });
 });
 
 // List members — admin-only.
