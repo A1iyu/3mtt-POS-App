@@ -20,10 +20,12 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET_KEY
 );
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-// Resend's shared sandbox sender — works with no domain setup.
-// Once you verify your own domain on Resend, switch this to e.g. otp@yourdomain.com
-const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+// This must be an email address you've verified as a sender in Brevo
+// (Settings → Senders, Domains & Dedicated IPs → Senders → Add a Sender).
+// Brevo verifies the individual email via a confirmation link — no domain
+// ownership required, unlike Resend's sandbox restriction.
+const FROM_EMAIL = process.env.FROM_EMAIL || 'your-verified-sender@example.com';
 // Where your front-end is actually hosted — used to build clickable invite
 // links. Defaults to local dev; set this in Render once the front-end has a
 // real public URL.
@@ -42,15 +44,25 @@ function generateOtp() {
 // Generic sender — every transactional email (OTP, invites, admin
 // notifications) goes through this one function.
 async function sendEmail(to, subject, html) {
-  const resendRes = await fetch('https://api.resend.com/emails', {
+  const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
+      'api-key': BREVO_API_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     },
-    body: JSON.stringify({ from: FROM_EMAIL, to, subject, html })
+    body: JSON.stringify({
+      sender: { name: '3MTT POS App', email: FROM_EMAIL },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html
+    })
   });
-  return resendRes.ok;
+  if (!brevoRes.ok) {
+    const errBody = await brevoRes.text();
+    console.error('Brevo send error:', errBody);
+  }
+  return brevoRes.ok;
 }
 
 async function sendOtpEmail(email, name, otp) {
@@ -70,7 +82,7 @@ app.post('/api/send-otp', async (req, res) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'A valid email is required' });
   }
-  if (!RESEND_API_KEY) {
+  if (!BREVO_API_KEY) {
     return res.status(500).json({ error: 'Email service is not configured on the server' });
   }
 
@@ -275,7 +287,7 @@ app.post('/api/organizations/:orgId/members', async (req, res) => {
   if (!adminUserId || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'adminUserId and a valid email are required' });
   }
-  if (!RESEND_API_KEY) {
+  if (!BREVO_API_KEY) {
     return res.status(500).json({ error: 'Email service is not configured on the server' });
   }
 
@@ -382,7 +394,7 @@ app.post('/api/invites/:token/accept', async (req, res) => {
   const orgName = invite.organizations?.name || 'Organization';
   const adminUserId = invite.organizations?.admin_user_id;
 
-  if (adminUserId && RESEND_API_KEY) {
+  if (adminUserId && BREVO_API_KEY) {
     const { data: adminUser } = await supabase.from('users').select('email').eq('id', adminUserId).maybeSingle();
     if (adminUser?.email) {
       sendEmail(adminUser.email, `${username} joined ${orgName}`, `
