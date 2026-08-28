@@ -715,6 +715,7 @@ class POSApp {
 
     if (viewName === 'profile') this.renderProfileScreen();
     else if (viewName === 'menu') this.renderDashboard();
+    else if (viewName === 'login') this.setLoginMode('personal');
 
     const homeBtn = document.getElementById('nav-btn-home');
     const histBtn = document.getElementById('nav-btn-history');
@@ -802,6 +803,40 @@ class POSApp {
     }, 1000);
   }
 
+  setLoginMode(mode = 'personal') {
+    this._loginMode = mode;
+    const label = document.getElementById('login-identifier-label');
+    const identifierInput = document.getElementById('login-identifier-input');
+    const togglePrefix = document.getElementById('login-member-toggle-prefix');
+    const toggleLink = document.getElementById('link-toggle-member-login');
+    const title = document.querySelector('#view-login .auth-title-exact');
+    const subtitle = document.querySelector('#view-login .auth-subtitle-exact');
+    const registerRow = document.getElementById('login-register-row');
+    const passwordInput = document.getElementById('login-password-input');
+
+    if (mode === 'member') {
+      if (title) title.textContent = 'Team Member Sign In';
+      if (subtitle) subtitle.textContent = 'Sign in with your assigned username to access your till.';
+      if (label) label.textContent = 'USERNAME';
+      if (identifierInput) identifierInput.placeholder = 'e.g. john_cashier';
+      if (togglePrefix) togglePrefix.textContent = 'Not a team member?';
+      if (toggleLink) toggleLink.textContent = 'Sign in with email/phone instead';
+      if (registerRow) registerRow.style.display = 'none';
+    } else {
+      this._loginMode = 'personal';
+      if (title) title.textContent = 'Welcome back, Agent';
+      if (subtitle) subtitle.textContent = 'Sign in to access your till and start transacting.';
+      if (label) label.textContent = 'EMAIL OR PHONE NUMBER';
+      if (identifierInput) identifierInput.placeholder = 'agent@example.com or 0801 234 5678';
+      if (togglePrefix) togglePrefix.textContent = 'Team member?';
+      if (toggleLink) toggleLink.textContent = 'Sign in with your username';
+      if (registerRow) registerRow.style.display = '';
+    }
+
+    if (identifierInput) identifierInput.value = '';
+    if (passwordInput) passwordInput.value = '';
+  }
+
   initEventListeners() {
     // Generic Enter Key binder for accessible form submissions
     const bindEnterKey = (inputs, action) => {
@@ -817,7 +852,7 @@ class POSApp {
     };
 
     // 1. Login (personal/admin OR org member — toggled via link-toggle-member-login)
-    this._loginMode = 'personal';
+    this.setLoginMode('personal');
 
     const performLogin = async () => {
       const identifierInput = document.getElementById('login-identifier-input')?.value.trim();
@@ -879,26 +914,8 @@ class POSApp {
     document.getElementById('link-toggle-member-login')?.addEventListener('click', (e) => {
       e.preventDefault();
       sound.playTap();
-
-      const label = document.getElementById('login-identifier-label');
-      const identifierInput = document.getElementById('login-identifier-input');
-      const toggleLink = document.getElementById('link-toggle-member-login');
-
-      this._loginMode = this._loginMode === 'member' ? 'personal' : 'member';
-
-      if (this._loginMode === 'member') {
-        if (label) label.textContent = 'USERNAME';
-        if (identifierInput) identifierInput.placeholder = 'e.g. john_cashier';
-        if (toggleLink) toggleLink.textContent = 'Not a team member? Sign in with email/phone instead';
-      } else {
-        if (label) label.textContent = 'EMAIL OR PHONE NUMBER';
-        if (identifierInput) identifierInput.placeholder = 'agent@example.com or 0801 234 5678';
-        if (toggleLink) toggleLink.textContent = 'Sign in with your username';
-      }
-
-      if (identifierInput) identifierInput.value = '';
-      const passwordInput = document.getElementById('login-password-input');
-      if (passwordInput) passwordInput.value = '';
+      const nextMode = this._loginMode === 'member' ? 'personal' : 'member';
+      this.setLoginMode(nextMode);
     });
 
     // 2. Navigation to "Create an Account" & Back
