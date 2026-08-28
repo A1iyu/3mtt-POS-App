@@ -7,7 +7,7 @@ import { store } from './transactions.js';
 import { receiptManager } from './receipt.js';
 
 // URL of the deployed backend (see /pos-otp-server). Update after deploying to Render.
-const API_BASE = 'https://threemtt-pos-app.onrender.com';
+const API_BASE = 'https://bizledger-wgxg.onrender.com';
 
 class POSApp {
     constructor() {
