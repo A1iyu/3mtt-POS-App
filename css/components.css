@@ -1148,28 +1148,32 @@
   transform-box: fill-box;
   transform-origin: bottom;
   animation-name: barGrowSweep;
-  animation-timing-function: ease-in-out;
+  animation-duration: 10s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   animation-iteration-count: infinite;
-  filter: drop-shadow(0 0 5px rgba(0, 208, 108, 0.85));
+  filter: drop-shadow(0 0 6px rgba(0, 208, 108, 0.85));
 }
 
 @keyframes barGrowSweep {
-  0%   { transform: scaleY(0); }
-  40%  { transform: scaleY(1); }
-  65%  { transform: scaleY(1); }
-  100% { transform: scaleY(0); }
+  0%   { transform: scaleY(0); opacity: 0.15; }
+  22%  { transform: scaleY(1); opacity: 1; }
+  72%  { transform: scaleY(1); opacity: 1; }
+  85%  { transform: scaleY(0.2); opacity: 0; }
+  100% { transform: scaleY(0); opacity: 0; }
 }
 
 .auth-bg-chart-svg .trend-line {
-  animation: trendLineDraw 6s ease-in-out infinite;
-  filter: drop-shadow(0 0 6px rgba(124, 255, 178, 0.9));
+  animation: trendLineDraw 10s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  filter: drop-shadow(0 0 8px rgba(124, 255, 178, 0.95));
 }
 
 @keyframes trendLineDraw {
   0%   { stroke-dashoffset: 1; opacity: 0; }
-  8%   { opacity: 1; }
-  70%  { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
+  3%   { opacity: 1; }
+  22%  { stroke-dashoffset: 0; opacity: 1; }
+  72%  { stroke-dashoffset: 0; opacity: 1; }
+  85%  { stroke-dashoffset: 0; opacity: 0; }
+  100% { stroke-dashoffset: 1; opacity: 0; }
 }
 
 .auth-bg-symbol {
@@ -1186,9 +1190,9 @@
 
 @keyframes authSymbolFloat {
   0%   { opacity: 0;    transform: translateY(24px) scale(0.85); }
-  15%  { opacity: 0.65; }
+  18%  { opacity: 0.65; }
   50%  { opacity: 0.85; transform: translateY(-14px) scale(1); }
-  85%  { opacity: 0.35; }
+  82%  { opacity: 0.35; }
   100% { opacity: 0;    transform: translateY(-46px) scale(0.9); }
 }
 
