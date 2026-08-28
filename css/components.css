@@ -74,7 +74,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 
 .encrypted-pill-exact {
@@ -89,6 +89,44 @@
   font-size: 0.775rem;
   font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+.auth-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  user-select: none;
+}
+
+.auth-brand-logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--ng-green-vibrant) 0%, var(--ng-green-dark) 100%);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 135, 81, 0.25);
+  flex-shrink: 0;
+}
+
+.auth-brand-logo-icon svg {
+  width: 17px;
+  height: 17px;
+  stroke: #ffffff;
+}
+
+.auth-brand-text {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.auth-brand-text span {
+  color: var(--ng-green-main);
+  font-weight: 800;
 }
 
 .brand-icon-box-exact {
