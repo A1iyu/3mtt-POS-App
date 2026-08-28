@@ -1,7 +1,7 @@
 {
-  "name": "pos-otp-server",
+  "name": "bizledger-server",
   "version": "1.0.0",
-  "description": "Email OTP service for the 3MTT POS Terminal registration flow",
+  "description": "Email OTP and Ledger service for BizLedger — Smart POS & Business Bookkeeper",
   "type": "module",
   "main": "server.js",
   "scripts": {

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   3MTT POS APP - LOCAL SESSION STORE
+   BIZLEDGER - LOCAL SESSION STORE
    Remembers which real (Supabase-backed) identity is currently signed in on
    this device — either a personal/admin `users` account, OR an org member
    account (a separate, username+password system). All actual sales/expense

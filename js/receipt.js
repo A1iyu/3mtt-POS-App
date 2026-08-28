@@ -1,5 +1,5 @@
 /* ==========================================================================
-   3MTT POS TERMINAL - THERMAL RECEIPT & SHARING MODULE
+   BIZLEDGER - THERMAL RECEIPT & SHARING MODULE
    ========================================================================== */
 
 import { sound } from './audio.js';
@@ -24,12 +24,12 @@ export class ReceiptManager {
     if (!tx || !container) return;
 
     const tillNum = store?.tillNumber || '5538 9535 44';
-    const merchant = (store?.tillName || store?.agentBusiness || '3MTT AGENT POS').toUpperCase();
+    const merchant = (store?.tillName || store?.agentBusiness || 'BIZLEDGER MERCHANT').toUpperCase();
 
     const html = `
       <div class="thermal-receipt-paper" id="printable-receipt">
         <div class="receipt-header">
-          <div class="receipt-brand-title">3MTT AGENT BANKING</div>
+          <div class="receipt-brand-title">BIZLEDGER TERMINAL</div>
           <div style="font-size:0.65rem; color:#4b5563; margin-top:2px;">TERMINAL ID: ${tillNum}</div>
           <div style="font-size:0.65rem; color:#4b5563;">MERCHANT: ${merchant}</div>
           <div style="font-size:0.65rem; color:#4b5563; margin-top:2px;">${this.formatDate(tx.timestamp)}</div>
@@ -83,9 +83,9 @@ export class ReceiptManager {
   // Copy receipt text to clipboard
   async copyReceiptText(tx, showToastCallback) {
     sound.playTap();
-    const merchant = (store?.tillName || store?.agentBusiness || '3MTT AGENT POS').toUpperCase();
+    const merchant = (store?.tillName || store?.agentBusiness || 'BIZLEDGER MERCHANT').toUpperCase();
     const text = `
-🧾 *3MTT POS TRANSACTION RECEIPT*
+🧾 *BIZLEDGER TRANSACTION RECEIPT*
 ───────────────────────
 • Type: ${tx.title}
 • Amount: ₦${tx.amount.toLocaleString()}
@@ -116,7 +116,7 @@ Thank you for your patronage!
   shareWhatsApp(tx) {
     sound.playTap();
     const text = encodeURIComponent(
-      `🧾 *3MTT POS RECEIPT*\n` +
+      `🧾 *BIZLEDGER RECEIPT*\n` +
       `Amount: ₦${tx.amount.toLocaleString()}\n` +
       `Fee: ₦${tx.fee.toLocaleString()}\n` +
       `Beneficiary: ${tx.beneficiary}\n` +

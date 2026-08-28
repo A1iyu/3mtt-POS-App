@@ -1,5 +1,5 @@
 /* ==========================================================================
-   3MTT POS TERMINAL - AUDIO & HAPTIC FEEDBACK ENGINE
+   BIZLEDGER - AUDIO & HAPTIC FEEDBACK ENGINE
    ========================================================================== */
 
 class SoundEngine {

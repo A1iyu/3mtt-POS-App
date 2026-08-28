@@ -1,5 +1,5 @@
 /* ==========================================================================
-   3MTT POS TERMINAL - KEYPAD CONTROLLER & AMOUNT UTILS
+   BIZLEDGER - KEYPAD CONTROLLER & AMOUNT UTILS
    ========================================================================== */
 
 import { sound } from './audio.js';

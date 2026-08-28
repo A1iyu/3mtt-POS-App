@@ -1,6 +1,6 @@
 /* ==========================================================================
-   3MTT POS TERMINAL - OTP + LEDGER + ORGANIZATIONS SERVER
-   Sends a real 6-digit email OTP via Resend and verifies it, manages the
+   BIZLEDGER - OTP + LEDGER + ORGANIZATIONS SERVER
+   Sends a real 6-digit email OTP via Brevo and verifies it, manages the
    real sales/expenses ledger, and manages organizations + their members.
    Deploy this folder to Render as a Web Service (Node).
    ========================================================================== */
@@ -52,7 +52,7 @@ async function sendEmail(to, subject, html) {
       'Accept': 'application/json'
     },
     body: JSON.stringify({
-      sender: { name: '3MTT POS App', email: FROM_EMAIL },
+      sender: { name: 'BizLedger', email: FROM_EMAIL },
       to: [{ email: to }],
       subject,
       htmlContent: html
@@ -66,9 +66,9 @@ async function sendEmail(to, subject, html) {
 }
 
 async function sendOtpEmail(email, name, otp) {
-  return sendEmail(email, 'Your 3MTT POS verification code', `
+  return sendEmail(email, 'Your BizLedger verification code', `
     <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
-      <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+      <h2 style="color:#008751;margin:0 0 12px;">BizLedger</h2>
       <p style="color:#1f3a2c;">Hi ${name || 'there'}, your verification code is:</p>
       <p style="font-size:34px;font-weight:800;letter-spacing:8px;color:#0f2419;margin:16px 0;">${otp}</p>
       <p style="color:#52796f;font-size:13px;">This code expires in 5 minutes. If you didn't request this, you can safely ignore this email.</p>
@@ -219,9 +219,9 @@ app.post('/api/forgot-password', async (req, res) => {
   otpStore.set(cleanEmail, { otp, expiresAt: Date.now() + OTP_TTL_MS });
 
   try {
-    const ok = await sendEmail(cleanEmail, 'Reset your 3MTT POS Password', `
+    const ok = await sendEmail(cleanEmail, 'Reset your BizLedger Password', `
       <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
-        <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+        <h2 style="color:#008751;margin:0 0 12px;">BizLedger</h2>
         <p style="color:#1f3a2c;">Hi ${name}, your password reset verification code is:</p>
         <p style="font-size:34px;font-weight:800;letter-spacing:8px;color:#0f2419;margin:16px 0;">${otp}</p>
         <p style="color:#52796f;font-size:13px;">This code expires in 5 minutes. If you did not request a password reset, you can safely ignore this email.</p>
@@ -488,9 +488,9 @@ app.post('/api/organizations/:orgId/members', async (req, res) => {
 
   const inviteLink = `${FRONTEND_URL}/?invite=${invite.token}`;
 
-  const ok = await sendEmail(email, `You're invited to join ${org.name} on 3MTT POS`, `
+  const ok = await sendEmail(email, `You're invited to join ${org.name} on BizLedger`, `
     <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
-      <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+      <h2 style="color:#008751;margin:0 0 12px;">BizLedger</h2>
       <p style="color:#1f3a2c;">You've been invited to join <strong>${org.name}</strong> as a team member.</p>
       <p style="color:#1f3a2c;">Click below to create your own username and password:</p>
       <p style="margin:20px 0;"><a href="${inviteLink}" style="background:#008751;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Join ${org.name}</a></p>
@@ -574,7 +574,7 @@ app.post('/api/invites/:token/accept', async (req, res) => {
     if (adminUser?.email) {
       sendEmail(adminUser.email, `${username} joined ${orgName}`, `
         <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
-          <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+          <h2 style="color:#008751;margin:0 0 12px;">BizLedger</h2>
           <p style="color:#1f3a2c;"><strong>${username}</strong> (${invite.email}) just accepted your invite and joined <strong>${orgName}</strong>.</p>
         </div>
       `).catch(err => console.error('admin notify email error:', err));
@@ -859,7 +859,7 @@ app.get('/api/expenses', async (req, res) => {
   res.json({ expenses: data });
 });
 
-app.get('/', (req, res) => res.send('3MTT POS OTP service is running.'));
+app.get('/', (req, res) => res.send('BizLedger Cloud Service is running.'));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`OTP server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`BizLedger server running on port ${PORT}`));

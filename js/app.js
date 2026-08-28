@@ -1,5 +1,5 @@
 /* ==========================================================================
-   3MTT POS APP - APP CONTROLLER (Real Sales & Expense Ledger)
+   BIZLEDGER - APP CONTROLLER (Real Sales & Expense Ledger)
    ========================================================================== */
 
 import { sound } from './audio.js';
@@ -239,7 +239,7 @@ class POSApp {
         if (!entry) return;
         sound.playTap();
 
-        const merchant = (store.agentBusiness || store.agentName || '3MTT Agent POS').toUpperCase();
+        const merchant = (store.agentBusiness || store.agentName || 'BizLedger Merchant').toUpperCase();
         const isSale = entry.type === 'SALE';
 
         const itemRows = isSale
