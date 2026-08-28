@@ -282,16 +282,24 @@
 .forgot-pin-row-exact {
   display: flex;
   justify-content: flex-end;
-  margin-top: 0.45rem;
-  margin-bottom: 1.75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .forgot-pin-link-exact {
-  font-size: 0.875rem;
-  font-weight: 800;
-  color: var(--ng-green-main);
-  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.forgot-pin-link-exact:hover {
+  color: #a7f3d0;
+  text-decoration-color: #a7f3d0;
 }
 
 /* --------------------------------------------------------------------------
@@ -381,16 +389,24 @@
   text-align: center;
   margin-top: auto;
   padding: 1.5rem 0 0.5rem;
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  font-size: 0.92rem;
+  color: #e2f8ec;
   font-weight: 500;
 }
 
 .auth-footer-exact a {
-  color: var(--ng-green-main);
+  color: #ffffff;
   font-weight: 800;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #34d399;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auth-footer-exact a:hover {
+  color: #a7f3d0;
+  text-decoration-color: #a7f3d0;
 }
 
 /* --------------------------------------------------------------------------
@@ -1165,18 +1181,37 @@
 
 #view-login .auth-footer-exact,
 #view-register .auth-footer-exact {
-  color: #d7f5e6;
+  color: #e2f8ec;
 }
 
 #view-login .auth-footer-exact a,
 #view-register .auth-footer-exact a {
-  color: var(--ng-green-glow);
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #34d399;
+}
+
+#view-login .auth-footer-exact a:hover,
+#view-register .auth-footer-exact a:hover {
+  color: #a7f3d0;
+  text-decoration-color: #a7f3d0;
 }
 
 #view-login .forgot-pin-link-exact,
 #view-register .forgot-pin-link-exact {
-  color: var(--ng-green-glow);
-  font-weight: 800;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.5);
+}
+
+#view-login .forgot-pin-link-exact:hover,
+#view-register .forgot-pin-link-exact:hover {
+  color: #a7f3d0;
+  text-decoration-color: #a7f3d0;
 }
 
 #view-register .account-type-fieldset {

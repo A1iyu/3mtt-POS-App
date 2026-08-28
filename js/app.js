@@ -143,8 +143,8 @@ class POSApp {
         <div style="display:flex; align-items:center; gap:0.85rem;">
           <div class="biz-item-icon ${item.type.toLowerCase()}">
             ${item.type === 'SALE'
-              ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>'
-              : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>'}
+        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>'}
           </div>
           <div>
             <div style="font-size:1.05rem; font-weight:800; color:var(--text-dark);">${item.title}</div>
@@ -584,8 +584,8 @@ class POSApp {
     const typed = name.trim().toLowerCase();
     const knownForItem = typed
       ? this.loadRecentSaleItems()
-          .filter(it => it.name.toLowerCase() === typed)
-          .map(it => it.unit)
+        .filter(it => it.name.toLowerCase() === typed)
+        .map(it => it.unit)
       : [];
 
     const combined = [...new Set([...knownForItem, ...genericUnits])];
@@ -736,7 +736,7 @@ class POSApp {
 
   // OTP digit box auto-advance / backspace / paste logic
   initOtpBoxes() {
-    const ids = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'];
+    const ids = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'];
     const boxes = ids.map(id => document.getElementById(id)).filter(Boolean);
 
     boxes.forEach((box, idx) => {
@@ -958,9 +958,9 @@ class POSApp {
       const maskedEmail = email.replace(/(.{1}).+(@.+)/, '$1***$2');
       document.getElementById('otp-masked-email').textContent = maskedEmail;
 
-      ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+      ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) { el.value = ''; el.classList.remove('filled','error'); }
+        if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
       });
 
       sound.playTap();
@@ -1009,7 +1009,7 @@ class POSApp {
     // 4. Verify OTP → either finalize a real account (personal registration)
     // or finalize a new organization (org email verification)
     const performSubmitOtp = async () => {
-      const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
+      const entered = ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6']
         .map(id => document.getElementById(id)?.value || '')
         .join('');
 
@@ -1032,11 +1032,11 @@ class POSApp {
 
       const showOtpError = (message) => {
         sound.playError();
-        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
           document.getElementById(id)?.classList.add('error');
         });
         setTimeout(() => {
-          ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+          ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { el.value = ''; el.classList.remove('error'); }
           });
@@ -1145,9 +1145,9 @@ class POSApp {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to resend OTP');
 
-        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
           const el = document.getElementById(id);
-          if (el) { el.value = ''; el.classList.remove('filled','error'); }
+          if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
         });
         this.showToast('New OTP sent to your email!');
         this.startOtpTimer();
@@ -1761,9 +1761,9 @@ class POSApp {
         this._pendingOrgData = { orgName, email: newEmail, adminUserId: store.currentUserId, migrateExisting };
         const maskedEmail = newEmail.replace(/(.{1}).+(@.+)/, '$1***$2');
         document.getElementById('otp-masked-email').textContent = maskedEmail;
-        ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6'].forEach(id => {
+        ['otp-d1', 'otp-d2', 'otp-d3', 'otp-d4', 'otp-d5', 'otp-d6'].forEach(id => {
           const el = document.getElementById(id);
-          if (el) { el.value = ''; el.classList.remove('filled','error'); }
+          if (el) { el.value = ''; el.classList.remove('filled', 'error'); }
         });
 
         this.modals.createOrg.classList.remove('active');
