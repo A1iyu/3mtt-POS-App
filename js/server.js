@@ -184,6 +184,181 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, user });
 });
 
+// Request password reset OTP
+app.post('/api/forgot-password', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'A valid email is required' });
+  }
+
+  const cleanEmail = email.toLowerCase().trim();
+
+  // Check if account exists in users
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, name, email')
+    .eq('email', cleanEmail)
+    .maybeSingle();
+
+  let member = null;
+  if (!user) {
+    const { data: m } = await supabase
+      .from('org_members')
+      .select('id, username, email')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+    member = m;
+  }
+
+  if (!user && !member) {
+    return res.status(404).json({ error: 'No account found with this email address' });
+  }
+
+  const name = user?.name || member?.username || 'Agent';
+  const otp = generateOtp();
+  otpStore.set(cleanEmail, { otp, expiresAt: Date.now() + OTP_TTL_MS });
+
+  try {
+    const ok = await sendEmail(cleanEmail, 'Reset your 3MTT POS Password', `
+      <div style="font-family:Arial,sans-serif;padding:24px;background:#f0fdf4;">
+        <h2 style="color:#008751;margin:0 0 12px;">3MTT POS Terminal</h2>
+        <p style="color:#1f3a2c;">Hi ${name}, your password reset verification code is:</p>
+        <p style="font-size:34px;font-weight:800;letter-spacing:8px;color:#0f2419;margin:16px 0;">${otp}</p>
+        <p style="color:#52796f;font-size:13px;">This code expires in 5 minutes. If you did not request a password reset, you can safely ignore this email.</p>
+      </div>
+    `);
+    if (!ok) {
+      otpStore.delete(cleanEmail);
+      return res.status(502).json({ error: 'Failed to send reset code email. Please try again.' });
+    }
+    res.json({ success: true, maskedEmail: cleanEmail.replace(/(.{1}).+(@.+)/, '$1***$2') });
+  } catch (err) {
+    console.error('forgot-password error:', err);
+    otpStore.delete(cleanEmail);
+    res.status(500).json({ error: 'Server error while sending reset code' });
+  }
+});
+
+// Reset password with OTP
+app.post('/api/reset-password', async (req, res) => {
+  const { email, otp, newPassword } = req.body || {};
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ error: 'Email, OTP, and new password are required' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  const cleanEmail = email.toLowerCase().trim();
+  const record = otpStore.get(cleanEmail);
+
+  if (!record) {
+    return res.status(400).json({ error: 'No reset request found or session expired' });
+  }
+  if (Date.now() > record.expiresAt) {
+    otpStore.delete(cleanEmail);
+    return res.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+  }
+  if (record.otp !== String(otp).trim()) {
+    return res.status(400).json({ error: 'Incorrect verification code' });
+  }
+
+  otpStore.delete(cleanEmail);
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+
+  // Try updating in users
+  const { data: user, error: userErr } = await supabase
+    .from('users')
+    .update({ password_hash: passwordHash })
+    .eq('email', cleanEmail)
+    .select('id')
+    .maybeSingle();
+
+  // If not found in users, try org_members
+  if (!user) {
+    const { data: member, error: memberErr } = await supabase
+      .from('org_members')
+      .update({ password_hash: passwordHash })
+      .eq('email', cleanEmail)
+      .select('id')
+      .maybeSingle();
+
+    if (!member) {
+      return res.status(404).json({ error: 'Account not found to update password' });
+    }
+  }
+
+  res.json({ success: true, message: 'Password updated successfully' });
+});
+
+// Update password directly from Profile Setting
+app.post('/api/update-password', async (req, res) => {
+  const { userId, memberId, currentPassword, newPassword } = req.body || {};
+  if (!userId && !memberId) {
+    return res.status(400).json({ error: 'User ID or Member ID required' });
+  }
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  }
+
+  if (userId) {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, password_hash')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error || !user) return res.status(404).json({ error: 'User account not found' });
+
+    if (currentPassword) {
+      const match = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!match) return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({ password_hash: passwordHash })
+      .eq('id', userId);
+
+    if (updateErr) {
+      console.error('update password error:', updateErr);
+      return res.status(500).json({ error: 'Failed to update password' });
+    }
+
+    return res.json({ success: true, message: 'Password updated successfully' });
+  }
+
+  if (memberId) {
+    const { data: member, error } = await supabase
+      .from('org_members')
+      .select('id, password_hash')
+      .eq('id', memberId)
+      .maybeSingle();
+
+    if (error || !member) return res.status(404).json({ error: 'Member account not found' });
+
+    if (currentPassword) {
+      const match = await bcrypt.compare(currentPassword, member.password_hash);
+      if (!match) return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const { error: updateErr } = await supabase
+      .from('org_members')
+      .update({ password_hash: passwordHash })
+      .eq('id', memberId);
+
+    if (updateErr) {
+      console.error('update member password error:', updateErr);
+      return res.status(500).json({ error: 'Failed to update password' });
+    }
+
+    return res.json({ success: true, message: 'Password updated successfully' });
+  }
+});
+
 // ---- Organizations ----
 
 // Create an organization using the admin's OWN already-verified email — no

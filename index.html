@@ -577,6 +577,14 @@
             <span id="btn-profile-org-action-label">Create an organization</span>
           </button>
 
+          <button type="button" id="btn-open-update-password" class="btn-primary-green-exact" style="background:none; color:var(--text-dark); border:1.5px solid var(--border-subtle, #e2e8f0); margin-bottom:0.85rem; display:flex; align-items:center; justify-content:center; gap:0.55rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span>Update Password</span>
+          </button>
+
           <button type="button" id="btn-profile-logout" class="btn-primary-green-exact" style="background:#dc2626; color:#ffffff;">
             Lock / Sign Out
           </button>
@@ -853,6 +861,115 @@
         <button type="button" id="btn-print-entry-receipt" class="btn-primary-green-exact" style="margin-top:1.25rem; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print Receipt
+        </button>
+      </div>
+    </div>
+
+    <!-- =========================================================================
+         MODAL 5: FORGOT PASSWORD (OTP-backed Password Reset)
+         ========================================================================= -->
+    <div id="modal-forgot-password" class="modal-overlay" aria-hidden="true">
+      <div class="modal-box">
+        <div class="modal-header-row">
+          <h3 class="modal-title" style="display:flex; align-items:center; gap:0.55rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Reset Password
+          </h3>
+          <button class="modal-close-btn modal-backdrop-dismiss" aria-label="Close">✕</button>
+        </div>
+
+        <!-- Step 1: Enter email to request OTP -->
+        <div id="forgot-step-email">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">
+            Enter your registered email address. We will send a 6-digit verification code to reset your password.
+          </p>
+          <div class="field-group-exact" style="margin-bottom:1.5rem;">
+            <label class="field-label-exact">REGISTERED EMAIL</label>
+            <div class="field-input-box-exact">
+              <input type="email" id="forgot-email-input" placeholder="e.g. agent@example.com" />
+            </div>
+          </div>
+          <button type="button" id="btn-forgot-send-otp" class="btn-primary-green-exact">
+            Send Reset Code
+          </button>
+        </div>
+
+        <!-- Step 2: Enter OTP and New Password -->
+        <div id="forgot-step-reset" style="display:none;">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">
+            Enter the 6-digit code sent to <strong id="forgot-masked-email-display" style="color:var(--ng-green-dark);"></strong> and choose your new password.
+          </p>
+          <div class="field-group-exact">
+            <label class="field-label-exact">6-DIGIT VERIFICATION CODE</label>
+            <div class="field-input-box-exact">
+              <input type="text" id="forgot-otp-input" placeholder="e.g. 123456" maxlength="6" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="field-group-exact">
+            <label class="field-label-exact">NEW PASSWORD</label>
+            <div class="field-input-box-exact">
+              <input type="password" id="forgot-new-password-input" placeholder="At least 6 characters" />
+            </div>
+          </div>
+          <div class="field-group-exact" style="margin-bottom:1.5rem;">
+            <label class="field-label-exact">CONFIRM NEW PASSWORD</label>
+            <div class="field-input-box-exact">
+              <input type="password" id="forgot-new-password-confirm-input" placeholder="Re-enter new password" />
+            </div>
+          </div>
+          <button type="button" id="btn-forgot-submit-reset" class="btn-primary-green-exact">
+            Reset Password
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- =========================================================================
+         MODAL 6: UPDATE PASSWORD (Profile Settings)
+         ========================================================================= -->
+    <div id="modal-update-password" class="modal-overlay" aria-hidden="true">
+      <div class="modal-box">
+        <div class="modal-header-row">
+          <h3 class="modal-title" style="display:flex; align-items:center; gap:0.55rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Update Password
+          </h3>
+          <button class="modal-close-btn modal-backdrop-dismiss" aria-label="Close">✕</button>
+        </div>
+
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">
+          Update your account password. Enter your current password and a new secure password.
+        </p>
+
+        <div class="field-group-exact">
+          <label class="field-label-exact">CURRENT PASSWORD</label>
+          <div class="field-input-box-exact">
+            <input type="password" id="update-current-password-input" placeholder="Enter current password" />
+          </div>
+        </div>
+
+        <div class="field-group-exact">
+          <label class="field-label-exact">NEW PASSWORD</label>
+          <div class="field-input-box-exact">
+            <input type="password" id="update-new-password-input" placeholder="At least 6 characters" />
+          </div>
+        </div>
+
+        <div class="field-group-exact" style="margin-bottom:1.5rem;">
+          <label class="field-label-exact">CONFIRM NEW PASSWORD</label>
+          <div class="field-input-box-exact">
+            <input type="password" id="update-new-password-confirm-input" placeholder="Re-enter new password" />
+          </div>
+        </div>
+
+        <button type="button" id="btn-submit-update-password" class="btn-primary-green-exact">
+          Update Password
         </button>
       </div>
     </div>

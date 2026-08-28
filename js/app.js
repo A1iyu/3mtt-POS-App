@@ -690,7 +690,9 @@ class POSApp {
       recordSale: document.getElementById('modal-record-sale'),
       addExpense: document.getElementById('modal-add-expense'),
       entryDetail: document.getElementById('modal-entry-detail'),
-      createOrg: document.getElementById('modal-create-org')
+      createOrg: document.getElementById('modal-create-org'),
+      forgotPassword: document.getElementById('modal-forgot-password'),
+      updatePassword: document.getElementById('modal-update-password')
     };
 
     this.toastElem = document.getElementById('pos-toast');
@@ -750,6 +752,11 @@ class POSApp {
       });
 
       box.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('btn-submit-otp')?.click();
+          return;
+        }
         if (e.key === 'Backspace' && !box.value && idx > 0) {
           boxes[idx - 1].value = '';
           boxes[idx - 1].classList.remove('filled');
@@ -796,6 +803,19 @@ class POSApp {
   }
 
   initEventListeners() {
+    // Generic Enter Key binder for accessible form submissions
+    const bindEnterKey = (inputs, action) => {
+      inputs.forEach(id => {
+        const el = typeof id === 'string' ? document.getElementById(id) : id;
+        el?.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            action();
+          }
+        });
+      });
+    };
+
     // 1. Login (personal/admin OR org member — toggled via link-toggle-member-login)
     this._loginMode = 'personal';
 
@@ -854,6 +874,7 @@ class POSApp {
     };
 
     document.getElementById('btn-submit-login')?.addEventListener('click', performLogin);
+    bindEnterKey(['login-identifier-input', 'login-password-input'], performLogin);
 
     document.getElementById('link-toggle-member-login')?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -899,7 +920,7 @@ class POSApp {
     });
 
     // 3. Register Submission → request a real email OTP, then go to OTP screen
-    document.getElementById('btn-submit-register')?.addEventListener('click', async () => {
+    const performRegister = async () => {
       const name = document.getElementById('reg-name-input')?.value.trim();
       const biz = document.getElementById('reg-business-input')?.value.trim();
       const phone = document.getElementById('reg-phone-input')?.value.trim();
@@ -967,7 +988,10 @@ class POSApp {
         submitBtn.disabled = false;
         submitBtn.textContent = originalLabel;
       }
-    });
+    };
+
+    document.getElementById('btn-submit-register')?.addEventListener('click', performRegister);
+    bindEnterKey(['reg-name-input', 'reg-business-input', 'reg-phone-input', 'reg-email-input', 'reg-password-input', 'reg-password-confirm-input'], performRegister);
 
     this.initOtpBoxes();
 
@@ -982,9 +1006,9 @@ class POSApp {
       }
     });
 
-    // Verify OTP → either finalize a real account (personal registration)
+    // 4. Verify OTP → either finalize a real account (personal registration)
     // or finalize a new organization (org email verification)
-    document.getElementById('btn-submit-otp')?.addEventListener('click', async () => {
+    const performSubmitOtp = async () => {
       const entered = ['otp-d1','otp-d2','otp-d3','otp-d4','otp-d5','otp-d6']
         .map(id => document.getElementById(id)?.value || '')
         .join('');
@@ -1003,9 +1027,8 @@ class POSApp {
       }
 
       const verifyBtn = document.getElementById('btn-submit-otp');
-      const originalLabel = verifyBtn.textContent;
-      verifyBtn.disabled = true;
-      verifyBtn.textContent = 'Verifying...';
+      const originalLabel = verifyBtn ? verifyBtn.textContent : '';
+      if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.textContent = 'Verifying...'; }
 
       const showOtpError = (message) => {
         sound.playError();
@@ -1054,8 +1077,7 @@ class POSApp {
         } catch (err) {
           showOtpError(err.message || 'Incorrect OTP! Check the code sent to that email.');
         } finally {
-          verifyBtn.disabled = false;
-          verifyBtn.textContent = originalLabel;
+          if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.textContent = originalLabel; }
         }
         return;
       }
@@ -1101,10 +1123,11 @@ class POSApp {
       } catch (err) {
         showOtpError(err.message || 'Incorrect OTP! Check the code sent to your email.');
       } finally {
-        verifyBtn.disabled = false;
-        verifyBtn.textContent = originalLabel;
+        if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.textContent = originalLabel; }
       }
-    });
+    };
+
+    document.getElementById('btn-submit-otp')?.addEventListener('click', performSubmitOtp);
 
     document.getElementById('btn-resend-otp')?.addEventListener('click', async () => {
       const pending = this._pendingOrgData || this._pendingRegData;
@@ -1135,6 +1158,283 @@ class POSApp {
       }
     });
 
+    // 5. Accept Invite (Join Organization)
+    const performAcceptInvite = async () => {
+      const token = this._inviteToken || new URLSearchParams(window.location.search).get('invite');
+      if (!token) {
+        sound.playError();
+        this.showToast('Invalid or missing invite link');
+        return;
+      }
+
+      const username = document.getElementById('invite-username-input')?.value.trim();
+      const password = document.getElementById('invite-password-input')?.value;
+      const confirmPassword = document.getElementById('invite-password-confirm-input')?.value;
+
+      if (!username) {
+        sound.playError();
+        this.showToast('Please choose a username');
+        return;
+      }
+      if (!password || password.length < 6) {
+        sound.playError();
+        this.showToast('Password must be at least 6 characters');
+        return;
+      }
+      if (password !== confirmPassword) {
+        sound.playError();
+        this.showToast('Passwords do not match! Please check again');
+        return;
+      }
+
+      const btn = document.getElementById('btn-accept-invite');
+      const originalLabel = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Joining organization...'; }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/invites/${token}/accept`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to join organization');
+
+        store.setSignedInMember(data.member);
+        sound.playSuccess();
+        this.showToast(`Joined ${data.member.orgName || 'organization'} successfully!`);
+
+        // Clean invite token from browser URL
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+        this._inviteToken = null;
+
+        this.renderDashboard();
+        this.renderProfileScreen();
+        this.showView('menu');
+        this.loadLedgerFromBackend();
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Failed to join organization.');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+      }
+    };
+
+    document.getElementById('btn-accept-invite')?.addEventListener('click', performAcceptInvite);
+    bindEnterKey(['invite-username-input', 'invite-password-input', 'invite-password-confirm-input'], performAcceptInvite);
+
+    // 6. Forgot Password Modal & Flow
+    const openForgotPasswordModal = () => {
+      sound.playTap();
+      const emailInput = document.getElementById('forgot-email-input');
+      const otpInput = document.getElementById('forgot-otp-input');
+      const newPassInput = document.getElementById('forgot-new-password-input');
+      const confirmPassInput = document.getElementById('forgot-new-password-confirm-input');
+      const stepEmail = document.getElementById('forgot-step-email');
+      const stepReset = document.getElementById('forgot-step-reset');
+
+      if (stepEmail) stepEmail.style.display = 'block';
+      if (stepReset) stepReset.style.display = 'none';
+
+      // Pre-fill with login email if present
+      const loginId = document.getElementById('login-identifier-input')?.value.trim();
+      if (emailInput) {
+        emailInput.value = (loginId && loginId.includes('@')) ? loginId : '';
+      }
+      if (otpInput) otpInput.value = '';
+      if (newPassInput) newPassInput.value = '';
+      if (confirmPassInput) confirmPassInput.value = '';
+
+      this.modals.forgotPassword?.classList.add('active');
+    };
+
+    document.getElementById('link-forgot-pin')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      openForgotPasswordModal();
+    });
+
+    const performForgotSendOtp = async () => {
+      const email = document.getElementById('forgot-email-input')?.value.trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        sound.playError();
+        this.showToast('Please enter a valid email address');
+        return;
+      }
+
+      const btn = document.getElementById('btn-forgot-send-otp');
+      const originalLabel = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending code...'; }
+
+      try {
+        let res = await fetch(`${API_BASE}/api/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        // Fallback to /api/send-otp if /api/forgot-password route is not available on remote
+        if (res.status === 404) {
+          res = await fetch(`${API_BASE}/api/send-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name: 'Agent' })
+          });
+        }
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to send reset code');
+
+        this._forgotEmail = email;
+        const masked = data.maskedEmail || email.replace(/(.{1}).+(@.+)/, '$1***$2');
+        const displayEl = document.getElementById('forgot-masked-email-display');
+        if (displayEl) displayEl.textContent = masked;
+
+        document.getElementById('forgot-step-email').style.display = 'none';
+        document.getElementById('forgot-step-reset').style.display = 'block';
+        document.getElementById('forgot-otp-input')?.focus();
+
+        sound.playSuccess();
+        this.showToast(`Reset code sent to ${masked}`);
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Failed to send reset code');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+      }
+    };
+
+    document.getElementById('btn-forgot-send-otp')?.addEventListener('click', performForgotSendOtp);
+    bindEnterKey(['forgot-email-input'], performForgotSendOtp);
+
+    const performForgotSubmitReset = async () => {
+      const email = this._forgotEmail || document.getElementById('forgot-email-input')?.value.trim();
+      const otp = document.getElementById('forgot-otp-input')?.value.trim();
+      const newPassword = document.getElementById('forgot-new-password-input')?.value;
+      const confirmPassword = document.getElementById('forgot-new-password-confirm-input')?.value;
+
+      if (!email || !otp || otp.length < 6) {
+        sound.playError();
+        this.showToast('Please enter the 6-digit verification code');
+        return;
+      }
+      if (!newPassword || newPassword.length < 6) {
+        sound.playError();
+        this.showToast('New password must be at least 6 characters');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        sound.playError();
+        this.showToast('Passwords do not match! Please check again');
+        return;
+      }
+
+      const btn = document.getElementById('btn-forgot-submit-reset');
+      const originalLabel = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Resetting password...'; }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, otp, newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to reset password');
+
+        sound.playSuccess();
+        this.showToast('Password reset successfully! You can now sign in.');
+        this.modals.forgotPassword?.classList.remove('active');
+
+        // Pre-fill login with updated credentials
+        const loginInput = document.getElementById('login-identifier-input');
+        if (loginInput) loginInput.value = email;
+        const passInput = document.getElementById('login-password-input');
+        if (passInput) {
+          passInput.value = '';
+          passInput.focus();
+        }
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Failed to reset password');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+      }
+    };
+
+    document.getElementById('btn-forgot-submit-reset')?.addEventListener('click', performForgotSubmitReset);
+    bindEnterKey(['forgot-otp-input', 'forgot-new-password-input', 'forgot-new-password-confirm-input'], performForgotSubmitReset);
+
+    // 7. Update Password Modal (Profile Screen)
+    document.getElementById('btn-open-update-password')?.addEventListener('click', () => {
+      sound.playTap();
+      const curr = document.getElementById('update-current-password-input');
+      const np = document.getElementById('update-new-password-input');
+      const cnp = document.getElementById('update-new-password-confirm-input');
+      if (curr) curr.value = '';
+      if (np) np.value = '';
+      if (cnp) cnp.value = '';
+      this.modals.updatePassword?.classList.add('active');
+    });
+
+    const performUpdatePassword = async () => {
+      if (!store.currentUserId && !store.memberId) {
+        this.showToast('You must be signed in to update password');
+        return;
+      }
+
+      const currentPassword = document.getElementById('update-current-password-input')?.value;
+      const newPassword = document.getElementById('update-new-password-input')?.value;
+      const confirmPassword = document.getElementById('update-new-password-confirm-input')?.value;
+
+      if (!currentPassword) {
+        sound.playError();
+        this.showToast('Please enter your current password');
+        return;
+      }
+      if (!newPassword || newPassword.length < 6) {
+        sound.playError();
+        this.showToast('New password must be at least 6 characters');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        sound.playError();
+        this.showToast('New passwords do not match! Please check again');
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit-update-password');
+      const originalLabel = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Updating password...'; }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/update-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: store.currentUserId,
+            memberId: store.memberId,
+            currentPassword,
+            newPassword
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update password');
+
+        sound.playSuccess();
+        this.showToast('Password updated successfully!');
+        this.modals.updatePassword?.classList.remove('active');
+      } catch (err) {
+        sound.playError();
+        this.showToast(err.message || 'Failed to update password');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+      }
+    };
+
+    document.getElementById('btn-submit-update-password')?.addEventListener('click', performUpdatePassword);
+    bindEnterKey(['update-current-password-input', 'update-new-password-input', 'update-new-password-confirm-input'], performUpdatePassword);
+
     // Dashboard Header → Profile
     document.querySelector('.agent-profile-exact')?.addEventListener('click', () => {
       sound.playTap();
@@ -1150,11 +1450,6 @@ class POSApp {
         this.isPinMasked = !this.isPinMasked;
         passwordInput.type = this.isPinMasked ? 'password' : 'text';
       }
-    });
-
-    document.getElementById('link-forgot-pin')?.addEventListener('click', () => {
-      sound.playTap();
-      this.showToast('Enter your registered email/phone and password to sign in.');
     });
 
     // Bottom Navigation
@@ -1295,7 +1590,7 @@ class POSApp {
       }
     });
 
-    document.getElementById('btn-submit-add-expense')?.addEventListener('click', async () => {
+    const performSaveExpense = async () => {
       const title = document.getElementById('expense-title-input')?.value.trim();
       const category = document.getElementById('expense-category-select')?.value;
       const amount = parseFloat(document.getElementById('expense-amount-input')?.value);
@@ -1345,7 +1640,10 @@ class POSApp {
       } finally {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel; }
       }
-    });
+    };
+
+    document.getElementById('btn-submit-add-expense')?.addEventListener('click', performSaveExpense);
+    bindEnterKey(['expense-title-input', 'expense-amount-input', 'expense-note-input'], performSaveExpense);
 
     // History tab filter pills
     document.querySelectorAll('.history-filter-pill').forEach(pill => {
@@ -1378,7 +1676,13 @@ class POSApp {
 
     // Print Receipt button inside the entry detail modal
     document.getElementById('btn-print-entry-receipt')?.addEventListener('click', () => {
-      this.printEntryReceipt(this._activeDetailEntry);
+      sound.playTap();
+      const currentEntry = this._activeDetailEntry;
+      if (!currentEntry) return;
+      receiptManager.generateReceipt({
+        ...currentEntry,
+        agentName: store.agentName || store.agentBusiness || 'Agent'
+      });
     });
 
     // Toggle the "use a new email" field on the Create Organization modal
@@ -1391,7 +1695,7 @@ class POSApp {
 
     // Create Organization submit — either instant (own already-verified
     // email) or via a fresh OTP proof (a new email)
-    document.getElementById('btn-submit-create-org')?.addEventListener('click', async () => {
+    const performCreateOrg = async () => {
       const orgName = document.getElementById('org-name-input')?.value.trim();
       const useNewEmail = document.querySelector('input[name="org-email-choice"]:checked')?.value === 'new';
       const newEmail = document.getElementById('org-new-email-input')?.value.trim();
@@ -1409,11 +1713,11 @@ class POSApp {
       }
 
       const btn = document.getElementById('btn-submit-create-org');
-      const originalLabel = btn.textContent;
-      btn.disabled = true;
+      const originalLabel = btn ? btn.textContent : '';
+      if (btn) btn.disabled = true;
 
       if (!useNewEmail) {
-        btn.textContent = 'Creating...';
+        if (btn) btn.textContent = 'Creating...';
         try {
           const res = await fetch(`${API_BASE}/api/organizations`, {
             method: 'POST',
@@ -1438,14 +1742,13 @@ class POSApp {
           sound.playError();
           this.showToast(err.message || 'Could not create organization.');
         } finally {
-          btn.disabled = false;
-          btn.textContent = originalLabel;
+          if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
         }
         return;
       }
 
       // New email path: send OTP, then reuse the existing OTP screen to verify it
-      btn.textContent = 'Sending code...';
+      if (btn) btn.textContent = 'Sending code...';
       try {
         const res = await fetch(`${API_BASE}/api/send-otp`, {
           method: 'POST',
@@ -1471,10 +1774,12 @@ class POSApp {
         sound.playError();
         this.showToast(err.message || 'Could not send OTP.');
       } finally {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
+        if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
       }
-    });
+    };
+
+    document.getElementById('btn-submit-create-org')?.addEventListener('click', performCreateOrg);
+    bindEnterKey(['org-name-input', 'org-new-email-input'], performCreateOrg);
 
     document.getElementById('btn-back-from-org-admin')?.addEventListener('click', () => {
       sound.playTap();
@@ -1482,7 +1787,7 @@ class POSApp {
     });
 
     // Add a member — admin only, sets username/password directly
-    document.getElementById('btn-add-member')?.addEventListener('click', async () => {
+    const performAddMember = async () => {
       const email = document.getElementById('new-member-email-input')?.value.trim();
 
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1493,9 +1798,8 @@ class POSApp {
       if (!store.adminOrgId) return;
 
       const btn = document.getElementById('btn-add-member');
-      const originalLabel = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Sending invite...';
+      const originalLabel = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending invite...'; }
 
       try {
         const res = await fetch(`${API_BASE}/api/organizations/${store.adminOrgId}/members`, {
@@ -1513,10 +1817,12 @@ class POSApp {
         sound.playError();
         this.showToast(err.message || 'Could not send invite.');
       } finally {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
+        if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
       }
-    });
+    };
+
+    document.getElementById('btn-add-member')?.addEventListener('click', performAddMember);
+    bindEnterKey(['new-member-email-input'], performAddMember);
 
     // Remove a member (event delegation on the table body)
     document.getElementById('org-members-table-body')?.addEventListener('click', async (e) => {
@@ -1581,6 +1887,15 @@ class POSApp {
       btn.addEventListener('click', () => {
         sound.playTap();
         document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+      });
+    });
+
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          sound.playTap();
+          modal.classList.remove('active');
+        }
       });
     });
   }
